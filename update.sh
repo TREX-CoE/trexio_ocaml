@@ -1,5 +1,6 @@
 #!/bin/bash -x
 
+git submodule init trexio
 ROOT=$PWD
 OCAMLDIR=trexio/ocaml/trexio
 cd trexio
@@ -27,6 +28,7 @@ rm -rf lib
 cp -r $OCAMLDIR/lib .
 
 git add dune-project lib
+git submodule deinit trexio
 
 
 
