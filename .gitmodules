@@ -1,0 +1,3 @@
+[submodule "trexio"]
+	path = trexio
+	url = https://github.com/trex-coe/trexio
