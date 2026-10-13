@@ -85,23 +85,27 @@ make test
 make install
 ```
 
-### Regenerating the binding after a TREXIO C API change
+### Upgrading the binding (maintainers)
 
 The OCaml library sources (`lib/trexio.ml`, `lib/trexio.mli`,
 `lib/trexio_stubs.c`) and the generator input (`trex.json`) are **generated
-and committed**; nobody ever fetches anything at build time. After a new TREXIO
-C release (or once the binding version in `dune-project` is bumped), run the
-single code-generation driver:
+and committed**; nobody ever fetches anything at build time. The binding is
+upgraded from a released TREXIO C library, from time to time, in four steps:
 
-```sh
-./update.sh
-```
-
-It fetches the pinned release tarball (cached under `_fetch/`), refreshes
-`trex.json` from it, regenerates the `lib/` sources via `read_json.py`,
-runs `dune build @runtest`, and prints the `git status`/`git diff` of
-`lib/` + `trex.json` — review and commit the diff as one change if the TREXIO
-C API actually changed.
+1. **Bump the binding version** when targeting a new C release: the new
+   version goes into `dune-project` **and** `trexio.opam` +
+   `conf-trexio.opam` (all three must agree — the generator enforces this).
+   The C tag is derived automatically: `2.7.101` → `v2.7.1`.
+2. **Regenerate**: run `./update.sh` — it fetches the pinned release tarball
+   (cached under `_fetch/`), asserts the tarball's own version, refreshes
+   `trex.json`, regenerates the `lib/` sources via `read_json.py`, and then
+   runs `dune build @runtest` (build + tests, byte and native). If the C API
+   changed and a test or stub no longer holds, it fails here — fix that first.
+3. **Verify the user-facing path**: `opam install . --with-test` from a clean
+   OPAM switch, with the C library resolvable via `pkg-config` (the build is
+   fully hermetic — no network, no python needed).
+4. **Review and commit** the version bump, the regenerated `lib/` + `trex.json`,
+   and any test fixes as one change.
 
 ### Prerequisites
 
