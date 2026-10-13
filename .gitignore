@@ -32,7 +32,11 @@ _opam/
 lib/trexio.ml
 lib/trexio.mli
 lib/trexio_stubs.c
+# python bytecode cache
+__pycache__/
 # fetched TREXIO release tarball + extraction
 _fetch/
+# bootstrapped C-library prefix (setup.sh install-c-library)
+_prefix/
 # local code-generation input (extracted from tarball)
 trex.json

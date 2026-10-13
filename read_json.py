@@ -1,26 +1,66 @@
 #!/usr/bin/env python
 
 import json
+import os
+import re
+import sys
 
-json_file = "../../trex.json"
+# repo root (placed here by setup.sh); optional override for manual runs:
+#   python3 read_json.py /path/to/trex.json
+json_file = "trex.json"
 stubs_file= "trexio_stubs.c"
 ml_file   = "trexio.ml"
 mli_file  = ml_file+"i"
 
+def fail(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
 def check_version():
-   with open('dune-project','r') as f:
-      for line in f:
-         if line.startswith("(version"):
-            ocaml_version = line.split()[1].strip().replace(')','')
-            break
-   with open('../../configure.ac','r') as f:
-      for line in f:
-         if line.startswith("AC_INIT"):
-            trexio_version = line.split(',')[1].strip()[1:-1]
-            break
-   if ocaml_version != trexio_version:
-      print(f"Inconsistent versions:\nTREXIO:{trexio_version}\nOCaml: {ocaml_version}\n")
-      raise
+    # dune-project is the single source of truth for the binding version.
+    with open('dune-project','r') as f:
+       for line in f:
+          if line.startswith("(version"):
+             dune_version = line.split()[1].strip().replace(')','')
+             break
+       else:
+          fail("dune-project: no (version ...) line found")
+
+    # Versioning convention (Rust-binding convention, cf. trexio-rs):
+    #   MAJOR.MINOR.PATCHR[R]  ==  TREXIO C library MAJOR.MINOR.(PATCH/100)
+    #                               + 2-digit binding revision RR
+    # e.g. 2.6.101 = TREXIO C 2.6.1 + binding revision 01; the patch
+    # component must therefore have at least 3 digits.
+    m = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", dune_version)
+    if m is None or len(m.group(3)) < 3:
+       fail(
+          "dune-project version '%s' does not follow the binding\n"
+          "versioning convention (Rust-binding style): the patch component\n"
+          "must encode the TREXIO C-library patch plus a 2-digit binding\n"
+          "revision, e.g. 2.6.1NN = TREXIO C 2.6.1 + binding revision NN\n"
+          "(2.6.101). A bare C-library version such as 2.6.1 is not a valid\n"
+          "binding version.\n" % dune_version)
+
+    # Every opam record that exists must carry the same version.
+    # (conf-trexio.opam is created by a later task; its absence is not an error.)
+    for opam in ("trexio.opam", "conf-trexio.opam"):
+       if not os.path.exists(opam):
+          if opam == "trexio.opam":
+             fail("opam file %s not found" % opam)
+          print("note: %s is not present yet; skipping its version check"
+                % opam, file=sys.stderr)
+          continue
+       with open(opam,'r') as f:
+          for line in f:
+             if line.startswith("version:"):
+                opam_version = line.split()[1].strip().strip('"')
+                break
+          else:
+             fail("%s: no version: line found" % opam)
+       if opam_version != dune_version:
+          fail("Inconsistent versions:\n"
+               "dune-project: %s\n%s: %s\n"
+               % (dune_version, opam, opam_version))
 
 def write_stubs(data):
 
@@ -657,6 +697,10 @@ def write_ml(data):
 
 
 def main():
+
+    global json_file
+    if len(sys.argv) > 1:
+        json_file = sys.argv[1]
 
     check_version()
     with open(json_file,'r') as f:
