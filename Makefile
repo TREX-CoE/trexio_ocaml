@@ -15,4 +15,4 @@ install:
 clean:
 	dune clean
 cleanall: clean
-	rm -rf _fetch _prefix tmp
+	rm -rf _fetch _prefix tmp tmp_*

@@ -287,7 +287,9 @@ let read fname backend =
 
 (* ---------------------------------------------------------------- entry *)
 
-let dir = Filename.concat (Sys.getcwd ()) "tmp"
+(* Per-process tmp directory: the byte and native test binaries run in
+   parallel under `dune build @runtest` and must not share data files. *)
+let dir = Filename.concat (Sys.getcwd ()) (Printf.sprintf "tmp_%d" (Unix.getpid ()))
 let text_file = Filename.concat dir "test_write.dir"
 let h5_file = Filename.concat dir "test_write.hdf5"
 

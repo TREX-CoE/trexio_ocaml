@@ -1,7 +1,7 @@
 (test
  (name trexio_tests)
  (modules trexio_tests)
- (libraries trexio)
+ (libraries trexio unix)
  ; Stage the foreign C stubs (dlltrexio_stubs.so) into dune's runtime C-library
  ; search path so the *byte* executable can dlopen them at test-run time.
  (deps "../trexio.install")
