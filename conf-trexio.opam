@@ -9,6 +9,8 @@ authors: [
   "Evgeny Posenitskiy <posenitskiy@irsamc.ups-tlse.fr>"
 ]
 license: "BSD-3-Clause"
+homepage: "https://github.com/trex-coe/trexio_ocaml"
+bug-reports: "https://github.com/trex-coe/trexio_ocaml/issues"
 tags: [ "system" "library" ]
 depends: [
   "conf-pkg-config" {build}
