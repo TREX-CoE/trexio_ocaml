@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & Test (ubuntu-latest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------
+      # 1. Autotools toolchain + HDF5 for the C library.
+      #    The release tarball builds via ./configure (autotools), so
+      #    the CMake and python3 the plan listed are not needed.
+      # ---------------------------------------------------------------
+      - name: Install autotools and HDF5
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential automake autoconf libtool pkg-config \
+            libhdf5-dev
+
+      # ---------------------------------------------------------------
+      # 2. Get the TREXIO C library from the pinned release (autotools)
+      #    ./setup.sh derives the tag from dune-project, fetches the
+      #    release tarball under _fetch/, and runs
+      #    ./configure --prefix=... --with-hdf5=yes --without-fortran,
+      #    make -j, make install.
+      # ---------------------------------------------------------------
+      - name: Compute TREXIO C library tag from dune-project (Rust-binding convention; echo for the log)
+        run: |
+          PV=$(sed -n 's/.*version \([0-9.][0-9.]*\).*/\1/p' dune-project | head -1)
+          MAJOR=$(echo "$PV" | cut -d. -f1)
+          MINOR=$(echo "$PV" | cut -d. -f2)
+          PATCH=$(echo "$PV" | cut -d. -f3)
+          # Binding 2.6.1NN targets C library 2.6.1 (same rule as trexio-rs CI)
+          echo "Binding $PV -> C library ${MAJOR}.${MINOR}.$(( PATCH / 100 ))"
+
+      - name: Build and install the TREXIO C library (autotools, from the pinned release)
+        run: |
+          sudo ./setup.sh install-c-library /usr/local
+          sudo ldconfig
+          pkg-config --modversion trexio
+
+      # ---------------------------------------------------------------
+      # 3. OCaml: setup, install (conf-trexio check + dune build +
+      #    tests via opam), then run the suite directly with dune.
+      # ---------------------------------------------------------------
+      - name: Setup opam
+        uses: opam-action/opam-action@v2
+        with:
+          switch: 5.2
+          packages: dune dune-configurator conf-pkg-config odoc
+          cache: true
+
+      - name: Install the OCaml binding (runs conf-trexio check, dune build, tests)
+        run: opam install . --with-test -y
+
+      # Test suite: tests/trexio_tests.ml (the plan calls it test_trexio.ml)
+      - name: Run the test suite again in verbose mode
+        run: dune build @runtest --verbose
+
+      - name: Upload build artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dune-logs
+          path: _build/
+          retention-days: 7
+
+  # -----------------------------------------
+  # Cheap guard: all declared versions agree
+  # -----------------------------------------
+  versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: check dune-project / trexio.opam / conf-trexio.opam agree and follow the convention
+        run: |
+          set -e
+          PV=$(sed -n 's/.*version \([0-9.][0-9.]*\).*/\1/p' dune-project | head -1)
+          PATCH=$(echo "$PV" | cut -d. -f3)
+          [ "$PATCH" -ge 100 ] || { echo "patch component must be 3 digits (2.6.1NN), got $PV"; exit 1; }
+          grep -q "version: \"${PV}\"" trexio.opam  || { echo "trexio.opam";    exit 1; }
+          grep -q "version: \"${PV}\"" conf-trexio.opam \
+                                             || { echo "conf-trexio.opam"; exit 1; }
+          echo "all versions = $PV (C library = $PV with last two digits ignored)"
+
+  # ----------------------------------------
+  # Non-blocking reminder when a new release
+  # of the C library appears upstream
+  # ----------------------------------------
+  watch-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: compare C library version with latest TREXIO release
+        run: |
+          LATEST=$(curl -fsSL https://api.github.com/repos/TREX-CoE/trexio/releases/latest \
+            | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
+          PV=$(sed -n 's/.*version \([0-9.][0-9.]*\).*/\1/p' dune-project | head -1)
+          Pinned="$(echo "$PV" | cut -d. -f1).$(echo "$PV" | cut -d. -f2).$(($(echo "$PV" | cut -d. -f3) / 100))"
+          echo "pinned C=$Pinned, latest C=$LATEST"
+          if [ "$LATEST" != "$Pinned" ]; then
+            echo "::warning::TREXIO released v$LATEST; binding is built against v$Pinned.
+            Bump the dune-project version (C patch digit), rebuild and re-run tests."
+          fi
