@@ -114,7 +114,8 @@ git diff -- lib/        # what OCaml users get: the binding's API surface
 
 ## Step 6 — Publish (once the package is in the OPAM repository)
 
-Open a PR to `ocamllabs/opam` bumping **both** records — `trexio` *and*
+Open a PR to the OPAM repository [ocaml/opam-repository](https://github.com/ocaml/opam-repository)
+bumping **both** records — `trexio` *and*
 `conf-trexio` — to the new version, together, in one PR. That is the moment
 `opam update && opam install trexio` reaches the new code for users.
 
