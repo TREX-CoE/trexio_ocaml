@@ -37,3 +37,4 @@ install: [
   ["dune" "install"]
 ]
 dev-repo: "git+https://github.com/trex-coe/trexio_ocaml.git"
+url: "https://github.com/trex-coe/trexio_ocaml/archive/v2.6.101.tar.gz"
