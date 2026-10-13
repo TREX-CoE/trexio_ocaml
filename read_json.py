@@ -416,7 +416,7 @@ CAMLprim value caml_read_{group}_{element}(value file_in, value offset_in, value
   double* value_sparse_read = (double*) malloc (size_max*sizeof(double));
 
   trexio_exit_code rc = trexio_read_safe_{group}_{element}(file, offset, &buffer_size,
-                                               index_sparse_read, size_max,
+                                               index_sparse_read, {size}*size_max,
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
@@ -464,7 +464,7 @@ CAMLprim value caml_write_{group}_{element}(value file_in, value offset_in, valu
   }
 
   trexio_exit_code rc = trexio_write_safe_{group}_{element}(file, offset, buffer_size,
-                                               index_sparse_write, size_max,
+                                               index_sparse_write, {size}*size_max,
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {

@@ -38,5 +38,7 @@ __pycache__/
 _fetch/
 # bootstrapped C-library prefix (setup.sh install-c-library)
 _prefix/
+# test artifacts (dune @runtest writes tmp/ under the CWD)
+tmp/
 # local code-generation input (extracted from tarball)
 trex.json
