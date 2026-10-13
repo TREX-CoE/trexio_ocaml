@@ -16,10 +16,9 @@ bootstrap script in this repo) so that `pkg-config --exists trexio` succeeds.
 ## Provenance
 
 The OCaml binding previously lived in [TREX-CoE/trexio](https://github.com/TREX-CoE/trexio)
-under `ocaml/trexio/`. It has been moved out to this repository, which is now
-its home.
-
-<!-- TODO(task 07): link the PR/commit in TREX-CoE/trexio that removed the OCaml binding -->
+under `ocaml/trexio/`. It was removed from that repository
+([commit `fa86b5e`](https://github.com/TREX-CoE/trexio/commit/fa86b5e)) and moved
+here; this repository is now its home.
 
 ## Versioning contract
 
