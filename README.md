@@ -107,6 +107,9 @@ upgraded from a released TREXIO C library, from time to time, in four steps:
 4. **Review and commit** the version bump, the regenerated `lib/` + `trex.json`,
    and any test fixes as one change.
 
+The full playbook — version convention, diff review, verification gates,
+publishing, and troubleshooting — is in [UPGRADING.md](UPGRADING.md).
+
 ### Prerequisites
 
 - Building/testing: `gcc`, `pkg-config`, HDF5 development headers,
@@ -128,6 +131,7 @@ lib/trexio.ml .mli .c    # generated + committed library sources
 lib/dune, lib/config/*   # dune library + dune-configurator (strict pkg-config check)
 read_json.py             # code generator: trex.json + src/ -> lib/trexio.ml|.mli|trexio_stubs.c
 update.sh                # code-generation driver (fetch trex.json, regenerate, build)
+UPGRADING.md             # maintainer playbook: what to do when a new TREXIO C release appears
 setup.sh                 # optional C-library bootstrap (./setup.sh install-c-library)
 Makefile                 # dev convenience targets (bootstrap/build/test/install/update)
 ```
