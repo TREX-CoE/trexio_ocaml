@@ -29,9 +29,17 @@
   dune
   (dune-configurator :build)
   (conf-pkg-config :build)
-  odoc)
+  conf-trexio
+  (odoc :with-doc))
  (tags
   ("Quantum chemistry" "Library"))
 )
+
+(package
+ (name conf-trexio)
+ (synopsis "TREXIO C library is installed and detectable by pkg-config")
+ (description "Virtual package: checks that the TREXIO C library is installed.")
+ (allow_empty)
+ (depends (conf-pkg-config :build)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

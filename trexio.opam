@@ -15,26 +15,22 @@ homepage: "https://github.com/trex-coe/trexio_ocaml"
 doc: "https://trex-coe.github.io/trexio/"
 bug-reports: "https://github.com/trex-coe/trexio_ocaml/issues"
 depends: [
+  "conf-trexio"
   "dune" {>= "3.1"}
   "dune-configurator" {build}
   "conf-pkg-config" {build}
   "odoc" {with-doc}
 ]
 depexts: [
-  ["hdf5"] {os-distribution = "alpine"}
-  ["epel-release" "hdf5-devel"] {os-distribution = "centos"}
-  ["libhdf5-dev"] {os-distribution = "debian"}
-  ["hdf5"] {os-distribution = "homebrew"}
-  ["libhdf5-dev"] {os-distribution = "ubuntu"}
+  ["python3"] {os-family = "Debian"}
+  ["python3"] {os-family = "Alpine"}
+  ["python3"] {os-family = "RedHat"}
 ]
 build: [
-  ["dune" "subst"] {dev}
-  ["./compile-lib.sh" "%{prefix}%" "build"]
+  ["./setup.sh" "codegen"]
   [
     "dune"
     "build"
-    "-p"
-    name
     "-j"
     jobs
     "@install"
@@ -43,7 +39,6 @@ build: [
   ]
 ]
 install: [
- ["./compile-lib.sh" "%{prefix}%" "install"]
- ["dune" "install"]
+  ["dune" "install"]
 ]
 dev-repo: "git+https://github.com/trex-coe/trexio_ocaml.git"
