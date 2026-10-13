@@ -50,22 +50,22 @@ jobs:
           pkg-config --modversion trexio
 
       # ---------------------------------------------------------------
-      # 3. OCaml: setup, install (conf-trexio check + dune build +
-      #    tests via opam), then run the suite directly with dune.
+      # 3. OCaml: a fresh switch (OCaml 5.x from the official opam
+      #    repository), then the hermetic install of the binding:
+      #    conf-trexio check + dune build + tests, followed by a direct
+      #    suite run with dune.
       # ---------------------------------------------------------------
-      - name: Setup opam
-        uses: opam-action/opam-action@v2
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
         with:
-          switch: 5.2
-          packages: dune dune-configurator conf-pkg-config odoc
-          cache: true
+          ocaml-compiler: 5
 
       - name: Install the OCaml binding (runs conf-trexio check, dune build, tests)
         run: opam install . --with-test -y
 
       # Test suite: tests/trexio_tests.ml (the plan calls it test_trexio.ml)
       - name: Run the test suite again in verbose mode
-        run: dune build @runtest --verbose
+        run: opam exec -- dune build @runtest --verbose
 
       - name: Upload build artifacts on failure
         if: failure()
