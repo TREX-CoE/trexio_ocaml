@@ -1,9 +1,9 @@
 (lang dune 3.1)
 
 (name trexio)
-(version 2.2.0)
+(version 2.6.101)
 
-(generate_opam_files true)
+(generate_opam_files false)
 
 (source
  (github trex-coe/trexio_ocaml))
@@ -28,7 +28,8 @@
  (depends
   dune
   (dune-configurator :build)
-  (conf-pkg-config :build))
+  (conf-pkg-config :build)
+  odoc)
  (tags
   ("Quantum chemistry" "Library"))
 )
