@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# setup.sh — hermetic code-generation driver + optional C-library bootstrap.
+# setup.sh — optional TREXIO C-library bootstrap.
 #
 # Interface:
-#   ./setup.sh codegen                   # used by the opam build (default action)
 #   ./setup.sh install-c-library <prefix>   # one-shot bootstrap of the TREXIO C library
 #
-# Code generation is hermetic: it downloads ONLY the pinned TREXIO release
-# tarball to extract trex.json (the code generator input). The C library is
-# NEVER compiled as part of the OCaml build — it must be pre-installed
-# (distro package, conda-forge 'trexio', nix, or `./setup.sh install-c-library
-# <prefix>`), and dune-configurator resolves its compile/link flags via
-# `pkg-config trexio`.
+# Code generation lives in ./update.sh (the single owner of fetch + regenerate);
+# it is NOT called by the opam build, and neither is this script: the OCaml
+# package is built from the committed generated files.
+#
+# The C library is NEVER compiled as part of the OCaml build — it must be
+# pre-installed (distro package, conda-forge 'trexio', nix, or this script),
+# and dune-configurator resolves its compile/link flags via `pkg-config trexio`.
 #
 # Versioning (Rust-binding convention, cf. trexio-rs): the dune-project
 # version is the single source of truth.  2.6.1NN  ==  TREXIO C library 2.6.1
 # + binding revision NN.  The C-library tag used for downloads is derived as
 #   MAJOR.MINOR.(PATCH / 100),   e.g.  2.6.101 -> 2.6.1.
 #
-# Requirements for codegen in a hermetic environment: bash, sed, cut, curl,
-# tar, python3, and network access to github.com.
+# Requirements: bash, sed, cut, curl, tar, autotools (autoconf/automake/libtool,
+# gcc), HDF5 development headers, and network access to github.com.
 
 set -euo pipefail
 
@@ -26,8 +26,7 @@ cd "$(dirname "$0")"
 
 usage() {
   cat >&2 <<EOF
-usage: $(basename "$0") codegen
-       $(basename "$0") install-c-library <prefix>
+usage: $(basename "$0") install-c-library <prefix>
 EOF
   exit 1
 }
@@ -60,19 +59,10 @@ fetch() {
     || curl -fL --retry 3 -o "_fetch/src.tar.gz" "$URL_FALLBACK"
   tar xzf "_fetch/src.tar.gz" -C _fetch
   rm -f _fetch/src.tar.gz
-  echo "fetched TREXIO $V release for code generation" >&2
+  echo "fetched TREXIO $V release" >&2
 }
 
 # --- actions ------------------------------------------------------------------
-codegen() {
-  # No C compiler, no autotools, no HDF5 — codegen alone needs only curl +
-  # python3 (+ network) in a hermetic environment.
-  fetch
-  cp "$DIR/trex.json" .          # repo root, git-ignored
-  python3 read_json.py           # writes lib/trexio.ml(.mli) + lib/trexio_stubs.c
-  echo "code generation complete: lib/trexio.ml, lib/trexio.mli, lib/trexio_stubs.c" >&2
-}
-
 install_c_library() {
   # Optional bootstrap (dev/CI); intended use:
   #   ./setup.sh install-c-library $PWD/_prefix
@@ -103,8 +93,12 @@ install_c_library() {
   echo "TREXIO C library installed to: $prefix  (use PKG_CONFIG_PATH=\"\$prefix/lib/pkgconfig\")" >&2
 }
 
-case "${1:-codegen}" in
-  codegen)            shift; codegen "$@" ;;
+case "${1:-}" in
   install-c-library)  shift; install_c_library "${1:-}" ;;
+  codegen)
+    echo "setup.sh: 'codegen' moved to ./update.sh" >&2
+    echo "          run: ./update.sh" >&2
+    exit 1
+    ;;
   *)                  usage ;;
 esac

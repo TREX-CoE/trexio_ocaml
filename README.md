@@ -7,7 +7,7 @@ integrals.
 ## What this repository is
 
 A self-contained OPAM package: the OPAM package `trexio` (the binding), plus a
-`conf-trexio` check package (see below, being finalized). The binding wraps the
+`conf-trexio` check package (see below). The binding wraps the
 TREXIO **C library** via C stubs; it does **not** compile or bundle the C
 library. It requires a pre-installed TREXIO C library (any normal means:
 distro package, conda-forge `trexio`, nix channel, or the optional one-shot
@@ -40,8 +40,8 @@ is the `dune-project` file (there is no separate `VERSION` file).
 Two steps:
 
 1. Install the TREXIO C library by any normal means (distro package,
-   conda-forge `trexio`, nix, or the optional bootstrap
-   `./setup.sh install-c-library <prefix>` — being finalized), so that
+   conda-forge `trexio`, nix channel, or the optional one-shot bootstrap
+   `./setup.sh install-c-library <prefix>`) so that
    `pkg-config --exists trexio` succeeds.
 2. Install the OCaml binding from an OPAM switch:
 
@@ -49,9 +49,10 @@ Two steps:
    opam install trexio
    ```
 
-   (a future release task adds the companion `conf-trexio` package to the OPAM
-   repository; until the records are submitted, install from this repository,
-   e.g. `opam pin add trexio <path-to-this-repo>` with the C library present.)
+   (until the `trexio` + `conf-trexio` records are submitted to the OPAM
+   repository, install from this repository instead, e.g.
+   `opam pin add trexio <path-to-this-repo>` and
+   `opam pin add conf-trexio <path-to-this-repo>` with the C library present.)
 
 For a local, test-enabled install from a checkout:
 
@@ -59,45 +60,72 @@ For a local, test-enabled install from a checkout:
 opam install . --with-test
 ```
 
+The build itself is a plain `dune build` of **committed** sources (see
+"Regenerating the binding" below), so it needs **no network access and no
+python3** at build time — only the pre-installed C library, which
+`dune-configurator` locates via `pkg-config trexio`.
+
 ## Local development
 
 ```sh
 # optional one-shot bootstrap of the TREXIO C library into a prefix
-make bootstrap
+make bootstrap                        # = ./setup.sh install-c-library _prefix
+# then point the environment at it for manual dune runs (update.sh finds it
+# itself when the prefix is ./_prefix in this repo):
+export PKG_CONFIG_PATH="$PWD/_prefix/lib/pkgconfig"
+export LD_LIBRARY_PATH="$PWD/_prefix/lib"
 
-# codegen (fetch the pinned release tarball -> trex.json -> read_json.py) + dune build
+# build (uses the committed, already-generated sources)
 make
 
-# run the test suite
+# run the test suite (TEXT + HDF5 round-trips, byte + native)
 make test
 
 # install into the current OPAM switch
 make install
 ```
 
-> Note: the build toolchain in this repository (`setup.sh`/`Makefile`) is being
-> finalized in the next release task; the `Makefile` currently present is the
-> one imported from the previous location and will be rewritten.
+### Regenerating the binding after a TREXIO C API change
+
+The OCaml library sources (`lib/trexio.ml`, `lib/trexio.mli`,
+`lib/trexio_stubs.c`) and the generator input (`trex.json`) are **generated
+and committed**; nobody ever fetches anything at build time. After a new TREXIO
+C release (or once the binding version in `dune-project` is bumped), run the
+single code-generation driver:
+
+```sh
+./update.sh
+```
+
+It fetches the pinned release tarball (cached under `_fetch/`), refreshes
+`trex.json` from it, regenerates the `lib/` sources via `read_json.py`,
+runs `dune build @runtest`, and prints the `git status`/`git diff` of
+`lib/` + `trex.json` — review and commit the diff as one change if the TREXIO
+C API actually changed.
 
 ### Prerequisites
 
-- `gcc`, `cmake` (used to bootstrap the C library from the tarball)
-- `pkg-config`
-- HDF5 development headers
-- `python3` (code generation runs during the build)
-- `curl`
-- `dune >= 3.1`, `dune-configurator`, `conf-pkg-config`
+- Building/testing: `gcc`, `pkg-config`, HDF5 development headers,
+  `dune >= 3.1`, `dune-configurator`, `conf-pkg-config`
+- `./update.sh` only: additionally `curl`, `tar`, `python3`, and network
+  access to github.com (used only when `_fetch/trexio-<tag>` is not cached)
+- `make bootstrap` only: additionally autotools (`autoconf`, `automake`,
+  `libtool`) and the HDF5 development package
 
 ## Layout
 
 ```
-dune-project               # package/version source of truth (see contract above)
-trexio.opam                # OPAM record for the binding (rewritten in task 03)
-conf-trexio.opam           # NEW: check package (pkg-config --exists trexio) — incoming
-src/trexio.ml .mli .c      # hand-written binding *templates* (code-gen markers)
-lib/dune, lib/config/*     # dune library + dune-configurator (strict pkg-config check)
-read_json.py               # code generator: trex.json -> lib/trexio.ml|.mli|trexio_stubs.c
-Makefile, setup.sh         # dev driver / bootstrap (setup.sh incoming)
+dune-project             # package/version source of truth (see contract above)
+trexio.opam              # OPAM record for the binding
+conf-trexio.opam         # check package (pkg-config --exists trexio)
+trex.json                # generator input (committed; refreshed by ./update.sh)
+src/trexio.ml .mli .c    # hand-written binding *templates* (code-gen markers)
+lib/trexio.ml .mli .c    # generated + committed library sources
+lib/dune, lib/config/*   # dune library + dune-configurator (strict pkg-config check)
+read_json.py             # code generator: trex.json + src/ -> lib/trexio.ml|.mli|trexio_stubs.c
+update.sh                # code-generation driver (fetch trex.json, regenerate, build)
+setup.sh                 # optional C-library bootstrap (./setup.sh install-c-library)
+Makefile                 # dev convenience targets (bootstrap/build/test/install/update)
 ```
 
 ## License

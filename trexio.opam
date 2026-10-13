@@ -21,13 +21,7 @@ depends: [
   "conf-pkg-config" {build}
   "odoc" {with-doc}
 ]
-depexts: [
-  ["python3"] {os-family = "Debian"}
-  ["python3"] {os-family = "Alpine"}
-  ["python3"] {os-family = "RedHat"}
-]
 build: [
-  ["./setup.sh" "codegen"]
   [
     "dune"
     "build"

@@ -1,10 +1,10 @@
 PREFIX ?= $(CURDIR)/_prefix
-.PHONY: all codegen bootstrap build test install clean cleanall
+.PHONY: all update bootstrap build test install clean cleanall
 
-all: codegen build
-codegen:
-	./setup.sh codegen
-bootstrap:                                  # install the C library locally
+all: build
+update:                                         # refresh generated binding files from the pinned TREXIO release
+	./update.sh
+bootstrap:                                      # install the TREXIO C library locally
 	./setup.sh install-c-library $(PREFIX)
 build:
 	dune build
@@ -13,7 +13,6 @@ test:
 install:
 	opam install .
 clean:
-	rm -f lib/trexio.ml lib/trexio.mli lib/trexio_stubs.c trex.json
 	dune clean
 cleanall: clean
-	rm -rf _fetch _prefix
+	rm -rf _fetch _prefix tmp
