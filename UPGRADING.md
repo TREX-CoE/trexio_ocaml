@@ -21,6 +21,12 @@
   and the generator input (`trex.json`) are **committed**. `./update.sh` is the
   *only* place that fetches or regenerates anything; `opam install .` needs
   neither network access nor python3.
+- The TREXIO C release tarball is **vendored** in `external/` (plus its
+  `.sha256`) as the offline source for the C-library *bootstrap* builds —
+  `make bootstrap` and the `conf-trexio` bootstrap at `opam install` time,
+  which are offline-first from that tarball. `./update.sh` (the regeneration
+  flow) still fetches the release tarball over the network (cached under
+  `_fetch/`).
 
 ## Step 1 — Choose the new binding version and write it down
 
@@ -30,7 +36,11 @@
 2. Write that version into all **three** files: `dune-project`, `trexio.opam`,
    `conf-trexio.opam`. (The C tag is derived automatically from `dune-project`:
    `2.7.001` → `v2.7.0`.)
-3. Do not commit yet.
+3. **Replace the vendored C tarball**: store the new release-asset tarball as
+   `external/trexio-<Ctag>.tar.gz` (replacing the previous one) and regenerate
+   its checksum:
+   `cd external && sha256sum trexio-<Ctag>.tar.gz > trexio-<Ctag>.tar.gz.sha256`.
+4. Do not commit yet.
 
 ## Step 2 — Regenerate and build: `./update.sh` (or `make update`)
 
@@ -114,6 +124,11 @@ git diff -- lib/        # what OCaml users get: the binding's API surface
 
 ## Step 6 — Publish (once the package is in the OPAM repository)
 
+Important: This section has to be done by a human. AI agents are forbidden to
+make PRs in the opam repository. AI agents can suggest instructions to humans,
+and potentially prepare everything on the local machine, so that humans can
+proceed easly with this step.
+
 Open a PR to the OPAM repository [ocaml/opam-repository](https://github.com/ocaml/opam-repository)
 bumping **both** records — `trexio` *and*
 `conf-trexio` — to the new version, together, in one PR. That is the moment
@@ -146,7 +161,6 @@ initial submission of both records.)
 | `update.sh: tarball … reports version … refusing to proceed` | stale `_fetch/` cache — `rm -rf _fetch/trexio-<V>` and re-run. |
 | `update.sh` cannot fetch the release | tag is not a published release yet (asset **and** source archive 404) — check the C repo's releases page first. |
 | `SKIP HDF5` in test output | the C library in scope lacks HDF5 — rebuild it (`make bootstrap`) or fix the environment. Any `SKIP HDF5` is a gate failure. |
-| stray `5` printed in test output | cosmetic print from the C/HDF5 layer — not a failure. |
 | tests racing on a shared temp file | the suite uses per-PID test dirs; don't reintroduce shared paths in new tests. |
 | opam reports "synchronised (no changes)" and builds nothing | opam reused a stashed build tree — force a real build (Step 4.3). |
 | `watch-release` CI warning | time to run this procedure. |

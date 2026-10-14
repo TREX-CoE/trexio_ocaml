@@ -7,11 +7,16 @@ integrals.
 ## What this repository is
 
 A self-contained OPAM package: the OPAM package `trexio` (the binding), plus a
-`conf-trexio` check package (see below). The binding wraps the
-TREXIO **C library** via C stubs; it does **not** compile or bundle the C
-library. It requires a pre-installed TREXIO C library (any normal means:
-distro package, conda-forge `trexio`, nix channel, or the optional one-shot
-bootstrap script in this repo) so that `pkg-config --exists trexio` succeeds.
+`conf-trexio` provision package (see below). The binding wraps the TREXIO
+**C library** via C stubs; the binding's own build never compiles the C
+library. The `conf-trexio` dependency guarantees a C library is *available*:
+if `pkg-config --exists trexio` already succeeds (pre-installed C library —
+distro package, conda-forge `trexio`, nix channel, …) it is used as-is;
+otherwise `conf-trexio` builds the **vendored**
+`external/trexio-<Ctag>.tar.gz` release tarball (statically, offline) into
+the OPAM switch. Net effect: `opam install trexio` works on a machine with no
+TREXIO installed, and always prefers an existing C library when one is
+present.
 
 ## Provenance
 
@@ -36,22 +41,24 @@ is the `dune-project` file (there is no separate `VERSION` file).
 
 ## Installation (users)
 
-Two steps:
+One step:
 
-1. Install the TREXIO C library by any normal means (distro package,
-   conda-forge `trexio`, nix channel, or the optional one-shot bootstrap
-   `./setup.sh install-c-library <prefix>`) so that
-   `pkg-config --exists trexio` succeeds.
-2. Install the OCaml binding from an OPAM switch:
+1. Install the OCaml binding from an OPAM switch:
 
    ```sh
    opam install trexio
    ```
 
-   (until the `trexio` + `conf-trexio` records are submitted to the OPAM
+   The `conf-trexio` dependency handles the C library for you: it uses an
+   existing TREXIO C installation when `pkg-config --exists trexio`
+   succeeds, otherwise it builds the vendored
+   `external/trexio-<Ctag>.tar.gz` (statically, into the switch). A
+   pre-installed C library is always preferred over the bootstrap.
+
+   (Until the `trexio` + `conf-trexio` records are submitted to the OPAM
    repository, install from this repository instead, e.g.
    `opam pin add trexio <path-to-this-repo>` and
-   `opam pin add conf-trexio <path-to-this-repo>` with the C library present.)
+   `opam pin add conf-trexio <path-to-this-repo>`.)
 
 For a local, test-enabled install from a checkout:
 
@@ -60,19 +67,21 @@ opam install . --with-test
 ```
 
 The build itself is a plain `dune build` of **committed** sources (see
-"Regenerating the binding" below), so it needs **no network access and no
-python3** at build time — only the pre-installed C library, which
-`dune-configurator` locates via `pkg-config trexio`.
+"Regenerating the binding" below) and needs **no python3** at build time;
+nor any network access — the bootstrapped C library comes from the *vendored*
+tarball (below). `dune-configurator` locates the C library via
+`pkg-config trexio`, falling back to `$OPAM_SWITCH_PREFIX/lib/pkgconfig`
+when `conf-trexio` bootstrapped it into the switch.
 
 ## Local development
 
 ```sh
-# optional one-shot bootstrap of the TREXIO C library into a prefix
+# one-shot bootstrap of the TREXIO C library into ./_prefix (offline: from
+# the vendored external/ tarball; static-only, so no runtime paths needed):
 make bootstrap                        # = ./setup.sh install-c-library _prefix
 # then point the environment at it for manual dune runs (update.sh finds it
 # itself when the prefix is ./_prefix in this repo):
 export PKG_CONFIG_PATH="$PWD/_prefix/lib/pkgconfig"
-export LD_LIBRARY_PATH="$PWD/_prefix/lib"
 
 # build (uses the committed, already-generated sources)
 make
@@ -95,43 +104,52 @@ upgraded from a released TREXIO C library, from time to time, in four steps:
    version goes into `dune-project` **and** `trexio.opam` +
    `conf-trexio.opam` (all three must agree — the generator enforces this).
    The C tag is derived automatically: `2.7.101` → `v2.7.1`.
-2. **Regenerate**: run `./update.sh` — it fetches the pinned release tarball
+2. **Replace the vendored C tarball** with the new release: store the new
+   release-asset tarball as `external/trexio-<Ctag>.tar.gz` (replacing the
+   previous one) and regenerate its checksum:
+   `cd external && sha256sum trexio-<Ctag>.tar.gz > trexio-<Ctag>.tar.gz.sha256`.
+3. **Regenerate**: run `./update.sh` — it fetches the pinned release tarball
    (cached under `_fetch/`), asserts the tarball's own version, refreshes
    `trex.json`, regenerates the `lib/` sources via `read_json.py`, and then
    runs `dune build @runtest` (build + tests, byte and native). If the C API
    changed and a test or stub no longer holds, it fails here — fix that first.
-3. **Verify the user-facing path**: `opam install . --with-test` from a clean
-   OPAM switch, with the C library resolvable via `pkg-config` (the build is
-   fully hermetic — no network, no python needed).
-4. **Review and commit** the version bump, the regenerated `lib/` + `trex.json`,
-   and any test fixes as one change.
+4. **Verify the user-facing path**: `opam install . --with-test` from a clean
+   OPAM switch (the build is fully hermetic — no network, no python needed;
+   if no C library is installed, `conf-trexio` bootstraps it from
+   `external/` into the switch).
+5. **Review and commit** the version bump, the new `external/` tarball +
+   `.sha256`, the regenerated `lib/` + `trex.json`, and any test fixes as one
+   change.
 
 The full playbook — version convention, diff review, verification gates,
 publishing, and troubleshooting — is in [UPGRADING.md](UPGRADING.md).
 
 ### Prerequisites
 
-- Building/testing: `gcc`, `pkg-config`, HDF5 development headers,
-  `dune >= 3.1`, `dune-configurator`, `conf-pkg-config`
+- Building/testing: `gcc`, `pkg-config`, `dune >= 3.1`, `dune-configurator`,
+  `conf-pkg-config`; HDF5 development headers **optional** (without them the
+  bootstrapped C library is TEXT-only and the test suite prints `SKIP HDF5`)
 - `./update.sh` only: additionally `curl`, `tar`, `python3`, and network
   access to github.com (used only when `_fetch/trexio-<tag>` is not cached)
-- `make bootstrap` only: additionally autotools (`autoconf`, `automake`,
-  `libtool`) and the HDF5 development package
+- `make bootstrap` only: a C compiler + `make` (the vendored release tarball
+  ships its own `configure` and `libtool`, so no autotools packages are
+  needed); for an HDF5-enabled C library, the HDF5 development package
 
 ## Layout
 
 ```
 dune-project             # package/version source of truth (see contract above)
 trexio.opam              # OPAM record for the binding
-conf-trexio.opam         # check package (pkg-config --exists trexio)
+conf-trexio.opam         # provision package: system C library if present, else bootstrap external/ into the switch
 trex.json                # generator input (committed; refreshed by ./update.sh)
 src/trexio.ml .mli .c    # hand-written binding *templates* (code-gen markers)
 lib/trexio.ml .mli .c    # generated + committed library sources
-lib/dune, lib/config/*   # dune library + dune-configurator (strict pkg-config check)
+lib/dune, lib/config/*   # dune library + dune-configurator (pkg-config, with a $OPAM_SWITCH_PREFIX fallback)
 read_json.py             # code generator: trex.json + src/ -> lib/trexio.ml|.mli|trexio_stubs.c
 update.sh                # code-generation driver (fetch trex.json, regenerate, build)
 UPGRADING.md             # maintainer playbook: what to do when a new TREXIO C release appears
-setup.sh                 # optional C-library bootstrap (./setup.sh install-c-library)
+setup.sh                 # C-library bootstrap (./setup.sh install-c-library): offline from external/, static-only
+external/                # vendored TREXIO C release tarball + .sha256 (offline bootstrap source)
 Makefile                 # dev convenience targets (bootstrap/build/test/install/update)
 ```
 
