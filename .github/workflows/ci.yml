@@ -89,6 +89,76 @@ jobs:
           path: _build/
           retention-days: 7
 
+  # ---------------------------------------------------------------
+  # Bootstrap leg: the machine has NO TREXIO C library.
+  # The conf-trexio build step
+  #   (pkg-config --exists trexio || ./setup.sh build-c-library %prefix%)
+  # must then compile it from the vendored external/trexio-<V>.tar.gz
+  # (statically; its install: step places it into the opam switch), and the
+  # binding must build
+  # + test against it. The vendored release tarball is self-contained
+  # (pre-generated configure + libtool), so no autotools packages are
+  # needed on this leg.
+  # ---------------------------------------------------------------
+  build-and-test-bootstrap:
+    name: Build & Test (no system C lib - bootstrap, ubuntu-latest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools and HDF5 (NO TREXIO C library)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config libhdf5-dev
+
+      - name: "Guard: this leg must start without any TREXIO"
+        run: |
+          if pkg-config --exists trexio; then
+            echo "ERROR: trexio is installed - bootstrap leg invalid" >&2
+            exit 1
+          fi
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5
+
+      # Builds conf-trexio from the local pin. Its build step runs:
+      #   pkg-config --exists trexio || ./setup.sh build-c-library %prefix%
+      # and, finding nothing, compiles the vendored tarball (statically);
+      # the install step then places it into the switch.
+      - name: Install dependency packages (conf-trexio bootstraps the C library)
+        run: opam install . --deps-only --with-test -y
+
+      # discover.ml falls back to $OPAM_SWITCH_PREFIX/lib/pkgconfig/trexio.pc
+      # (the dune build env has no PKG_CONFIG_PATH pointing at the switch).
+      - name: Build, install and test the binding with dune
+        run: |
+          opam exec -- dune build @install
+          opam exec -- dune install
+          opam exec -- dune build @runtest --verbose
+
+      - name: Verify the bootstrap installed a static C library into the switch
+        run: |
+          opam exec -- sh -c '
+            ls "$OPAM_PREFIX/lib" | grep -x libtrexio.a
+            test -z "$(ls "$OPAM_PREFIX/lib" | grep "^libtrexio\.so" || true)"
+            test -f "$OPAM_PREFIX/lib/pkgconfig/trexio.pc"
+            grep -q "$OPAM_PREFIX/lib" _build/default/lib/c_library_flags.sexp
+            echo "OK: static bootstrap C library in the switch, used by the in-tree build"
+          '
+
+      - name: Upload build artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dune-logs-bootstrap
+          path: _build/
+          retention-days: 7
+
   # -----------------------------------------
   # Cheap guard: all declared versions agree
   # -----------------------------------------
