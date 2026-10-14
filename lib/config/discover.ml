@@ -1,10 +1,16 @@
 module C = Configurator.V1
 
-(** pkg-config prints space-separated words (e.g. `-L/x -ltrexio -lm`). *)
-let words s = C.Flags.extract_blank_separated_words s
+(** pkg-config prints space-separated words (e.g. `-L/x -ltrexio -lm`).
+    Drop the newlines of the RAW stdout first: a trailing whitespace
+    sequence would otherwise be extracted as a spurious token (e.g. "\n")
+    and end up in gcc's command line. (Configurator's own pkg-config query
+    sanitises internally; the raw Process.run path does not.) *)
+let words s =
+  let s = String.concat "" (String.split_on_char '\n' s) in
+  C.Flags.extract_blank_separated_words s
 
 (** Fallback discovery for a TREXIO C library that conf-trexio installed into the
-    current opam switch (its build step runs `setup.sh install-c-library
+    current opam switch (its install: step runs `setup.sh install-c-library
     <switch-prefix>`). Only consulted when pkg-config finds nothing on the default
     search paths (system/conda installs, or a PKG_CONFIG_PATH pointing at a
     ./setup.sh prefix). *)
