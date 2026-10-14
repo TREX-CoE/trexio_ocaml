@@ -72,7 +72,6 @@ CAMLprim value caml_set_one_based(value file)
 CAMLprim value caml_set_state(value file, value state)
 {
   CAMLparam2(file, state);
-  printf("%d\n", Int_val(state));
   trexio_exit_code rc = trexio_set_state( File_val(file), (int32_t) Int_val(state) );
   if (rc == TREXIO_SUCCESS) {
     CAMLreturn ( Val_unit );
@@ -118,11 +117,12 @@ CAMLprim value caml_to_orbital_list(value bitfield)
       d1[i] = Int64_val(Field(bitfield,i));
   }
 
-  int32_t* list = (int32_t*) malloc(N_int * sizeof(bitfield_t) * sizeof(int32_t));
+  int32_t* list = (int32_t*) malloc((size_t)N_int * (size_t)TREXIO_NORB_PER_INT * sizeof(int32_t));
   int32_t occupied_num = 0;
 
   trexio_exit_code rc = trexio_to_orbital_list (N_int, d1, list, &occupied_num);
   if (rc != TREXIO_SUCCESS) {
+     free(d1); free(list);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -162,6 +162,7 @@ CAMLprim value caml_read_determinant_list(value file_in, value offset_in, value 
 
   rc = trexio_read_determinant_list (file, offset, &buffer_size, buffer);
   if (rc != TREXIO_SUCCESS) {
+     free(buffer);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -209,6 +210,7 @@ CAMLprim value caml_write_determinant_list(value file_in, value offset_in, value
 
   rc = trexio_write_determinant_list (file, offset, buffer_size, buffer);
   if (rc != TREXIO_SUCCESS) {
+     free(buffer);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -229,6 +231,7 @@ CAMLprim value caml_read_determinant_coefficient(value file_in, value offset_in,
 
   trexio_exit_code rc = trexio_read_determinant_coefficient (file, offset, &buffer_size, buffer);
   if (rc != TREXIO_SUCCESS) {
+     free(buffer);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -258,6 +261,7 @@ CAMLprim value caml_write_determinant_coefficient(value file_in, value offset_in
 
   trexio_exit_code rc = trexio_write_determinant_coefficient (file, offset, buffer_size, buffer);
   if (rc != TREXIO_SUCCESS) {
+     free(buffer);
      caml_failwith(trexio_string_of_error(rc));
   }
 
