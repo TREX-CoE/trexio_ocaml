@@ -182,11 +182,14 @@ CAMLprim value caml_read_{group}_{element}(value file, value max_str_len_in)
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_{group}_{element}( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -242,6 +245,7 @@ CAMLprim value caml_read_safe_{group}_{element}(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_{group}_{element}_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -268,6 +272,7 @@ CAMLprim value caml_write_safe_{group}_{element}(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_{group}_{element}_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -293,6 +298,7 @@ CAMLprim value caml_read_safe_{group}_{element}(value file_in, value size_max_in
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_{group}_{element}_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -319,6 +325,7 @@ CAMLprim value caml_write_safe_{group}_{element}(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_{group}_{element}_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -350,6 +357,7 @@ CAMLprim value caml_read_safe_{group}_{element}(value file_in, value size_max_in
   trexio_exit_code rc = trexio_read_{group}_{element}(file, read_data, max_str_len);
 
   if (rc != TREXIO_SUCCESS) {
+     free(read_data[0]); free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -374,18 +382,21 @@ CAMLprim value caml_write_safe_{group}_{element}(value file_in, value size_max_i
   int32_t max_str_len = Int_val(max_str_len_in);
 
   char** c_array = (char**) malloc (size_max * sizeof(char*));
-  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char*));
+  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char));
   for (size_t i=1 ; i<size_max ; ++i) {
     c_array[i] = c_array[i-1] + max_str_len+1;
   }
   for (size_t i=0 ; i<size_max ; ++i) {
-    strcpy(c_array[i], String_val( Field(array, i) ));
+    const char* s = String_val( Field(array, i) );
+    if (strlen(s) > (size_t)max_str_len) {
+      free(c_array[0]); free(c_array);
+      caml_invalid_argument("trexio: string longer than max_str_len");
+    }
+    strcpy(c_array[i], s);
   }
-
-  printf("%d\\n", max_str_len);
-  fprintf(stderr,"%d\\n", max_str_len);
   trexio_exit_code rc = trexio_write_{group}_{element}(file, (const char**) c_array, max_str_len);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array[0]); free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array[0]);
@@ -420,6 +431,7 @@ CAMLprim value caml_read_{group}_{element}(value file_in, value offset_in, value
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -468,6 +480,7 @@ CAMLprim value caml_write_{group}_{element}(value file_in, value offset_in, valu
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 

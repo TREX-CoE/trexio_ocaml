@@ -72,7 +72,6 @@ CAMLprim value caml_set_one_based(value file)
 CAMLprim value caml_set_state(value file, value state)
 {
   CAMLparam2(file, state);
-  printf("%d\n", Int_val(state));
   trexio_exit_code rc = trexio_set_state( File_val(file), (int32_t) Int_val(state) );
   if (rc == TREXIO_SUCCESS) {
     CAMLreturn ( Val_unit );
@@ -118,11 +117,12 @@ CAMLprim value caml_to_orbital_list(value bitfield)
       d1[i] = Int64_val(Field(bitfield,i));
   }
 
-  int32_t* list = (int32_t*) malloc(N_int * sizeof(bitfield_t) * sizeof(int32_t));
+  int32_t* list = (int32_t*) malloc((size_t)N_int * (size_t)TREXIO_NORB_PER_INT * sizeof(int32_t));
   int32_t occupied_num = 0;
 
   trexio_exit_code rc = trexio_to_orbital_list (N_int, d1, list, &occupied_num);
   if (rc != TREXIO_SUCCESS) {
+     free(d1); free(list);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -218,6 +218,7 @@ CAMLprim value caml_read_safe_metadata_code(value file_in, value size_max_in, va
   trexio_exit_code rc = trexio_read_metadata_code(file, read_data, max_str_len);
 
   if (rc != TREXIO_SUCCESS) {
+     free(read_data[0]); free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -242,18 +243,21 @@ CAMLprim value caml_write_safe_metadata_code(value file_in, value size_max_in, v
   int32_t max_str_len = Int_val(max_str_len_in);
 
   char** c_array = (char**) malloc (size_max * sizeof(char*));
-  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char*));
+  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char));
   for (size_t i=1 ; i<size_max ; ++i) {
     c_array[i] = c_array[i-1] + max_str_len+1;
   }
   for (size_t i=0 ; i<size_max ; ++i) {
-    strcpy(c_array[i], String_val( Field(array, i) ));
+    const char* s = String_val( Field(array, i) );
+    if (strlen(s) > (size_t)max_str_len) {
+      free(c_array[0]); free(c_array);
+      caml_invalid_argument("trexio: string longer than max_str_len");
+    }
+    strcpy(c_array[i], s);
   }
-
-  printf("%d\n", max_str_len);
-  fprintf(stderr,"%d\n", max_str_len);
   trexio_exit_code rc = trexio_write_metadata_code(file, (const char**) c_array, max_str_len);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array[0]); free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array[0]);
@@ -317,6 +321,7 @@ CAMLprim value caml_read_safe_metadata_author(value file_in, value size_max_in, 
   trexio_exit_code rc = trexio_read_metadata_author(file, read_data, max_str_len);
 
   if (rc != TREXIO_SUCCESS) {
+     free(read_data[0]); free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -341,18 +346,21 @@ CAMLprim value caml_write_safe_metadata_author(value file_in, value size_max_in,
   int32_t max_str_len = Int_val(max_str_len_in);
 
   char** c_array = (char**) malloc (size_max * sizeof(char*));
-  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char*));
+  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char));
   for (size_t i=1 ; i<size_max ; ++i) {
     c_array[i] = c_array[i-1] + max_str_len+1;
   }
   for (size_t i=0 ; i<size_max ; ++i) {
-    strcpy(c_array[i], String_val( Field(array, i) ));
+    const char* s = String_val( Field(array, i) );
+    if (strlen(s) > (size_t)max_str_len) {
+      free(c_array[0]); free(c_array);
+      caml_invalid_argument("trexio: string longer than max_str_len");
+    }
+    strcpy(c_array[i], s);
   }
-
-  printf("%d\n", max_str_len);
-  fprintf(stderr,"%d\n", max_str_len);
   trexio_exit_code rc = trexio_write_metadata_author(file, (const char**) c_array, max_str_len);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array[0]); free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array[0]);
@@ -373,11 +381,14 @@ CAMLprim value caml_read_metadata_package_version(value file, value max_str_len_
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_metadata_package_version( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -405,11 +416,14 @@ CAMLprim value caml_read_metadata_description(value file, value max_str_len_in)
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_metadata_description( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -526,6 +540,7 @@ CAMLprim value caml_read_safe_nucleus_charge(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_nucleus_charge_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -552,6 +567,7 @@ CAMLprim value caml_write_safe_nucleus_charge(value file_in, value size_max_in, 
 
   trexio_exit_code rc = trexio_write_safe_nucleus_charge_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -578,6 +594,7 @@ CAMLprim value caml_read_safe_nucleus_coord(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_nucleus_coord_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -604,6 +621,7 @@ CAMLprim value caml_write_safe_nucleus_coord(value file_in, value size_max_in, v
 
   trexio_exit_code rc = trexio_write_safe_nucleus_coord_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -636,6 +654,7 @@ CAMLprim value caml_read_safe_nucleus_label(value file_in, value size_max_in, va
   trexio_exit_code rc = trexio_read_nucleus_label(file, read_data, max_str_len);
 
   if (rc != TREXIO_SUCCESS) {
+     free(read_data[0]); free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -660,18 +679,21 @@ CAMLprim value caml_write_safe_nucleus_label(value file_in, value size_max_in, v
   int32_t max_str_len = Int_val(max_str_len_in);
 
   char** c_array = (char**) malloc (size_max * sizeof(char*));
-  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char*));
+  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char));
   for (size_t i=1 ; i<size_max ; ++i) {
     c_array[i] = c_array[i-1] + max_str_len+1;
   }
   for (size_t i=0 ; i<size_max ; ++i) {
-    strcpy(c_array[i], String_val( Field(array, i) ));
+    const char* s = String_val( Field(array, i) );
+    if (strlen(s) > (size_t)max_str_len) {
+      free(c_array[0]); free(c_array);
+      caml_invalid_argument("trexio: string longer than max_str_len");
+    }
+    strcpy(c_array[i], s);
   }
-
-  printf("%d\n", max_str_len);
-  fprintf(stderr,"%d\n", max_str_len);
   trexio_exit_code rc = trexio_write_nucleus_label(file, (const char**) c_array, max_str_len);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array[0]); free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array[0]);
@@ -692,11 +714,14 @@ CAMLprim value caml_read_nucleus_point_group(value file, value max_str_len_in)
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_nucleus_point_group( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -783,6 +808,7 @@ CAMLprim value caml_read_safe_cell_a(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_cell_a_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -809,6 +835,7 @@ CAMLprim value caml_write_safe_cell_a(value file_in, value size_max_in, value ar
 
   trexio_exit_code rc = trexio_write_safe_cell_a_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -835,6 +862,7 @@ CAMLprim value caml_read_safe_cell_b(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_cell_b_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -861,6 +889,7 @@ CAMLprim value caml_write_safe_cell_b(value file_in, value size_max_in, value ar
 
   trexio_exit_code rc = trexio_write_safe_cell_b_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -887,6 +916,7 @@ CAMLprim value caml_read_safe_cell_c(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_cell_c_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -913,6 +943,7 @@ CAMLprim value caml_write_safe_cell_c(value file_in, value size_max_in, value ar
 
   trexio_exit_code rc = trexio_write_safe_cell_c_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -939,6 +970,7 @@ CAMLprim value caml_read_safe_cell_g_a(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_cell_g_a_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -965,6 +997,7 @@ CAMLprim value caml_write_safe_cell_g_a(value file_in, value size_max_in, value 
 
   trexio_exit_code rc = trexio_write_safe_cell_g_a_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -991,6 +1024,7 @@ CAMLprim value caml_read_safe_cell_g_b(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_cell_g_b_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -1017,6 +1051,7 @@ CAMLprim value caml_write_safe_cell_g_b(value file_in, value size_max_in, value 
 
   trexio_exit_code rc = trexio_write_safe_cell_g_b_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -1043,6 +1078,7 @@ CAMLprim value caml_read_safe_cell_g_c(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_cell_g_c_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -1069,6 +1105,7 @@ CAMLprim value caml_write_safe_cell_g_c(value file_in, value size_max_in, value 
 
   trexio_exit_code rc = trexio_write_safe_cell_g_c_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -1207,6 +1244,7 @@ CAMLprim value caml_read_safe_pbc_k_point(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_pbc_k_point_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -1233,6 +1271,7 @@ CAMLprim value caml_write_safe_pbc_k_point(value file_in, value size_max_in, val
 
   trexio_exit_code rc = trexio_write_safe_pbc_k_point_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -1259,6 +1298,7 @@ CAMLprim value caml_read_safe_pbc_k_point_weight(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_pbc_k_point_weight_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -1285,6 +1325,7 @@ CAMLprim value caml_write_safe_pbc_k_point_weight(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_pbc_k_point_weight_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -1558,11 +1599,14 @@ CAMLprim value caml_read_state_current_label(value file, value max_str_len_in)
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_state_current_label( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -1603,6 +1647,7 @@ CAMLprim value caml_read_safe_state_label(value file_in, value size_max_in, valu
   trexio_exit_code rc = trexio_read_state_label(file, read_data, max_str_len);
 
   if (rc != TREXIO_SUCCESS) {
+     free(read_data[0]); free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -1627,18 +1672,21 @@ CAMLprim value caml_write_safe_state_label(value file_in, value size_max_in, val
   int32_t max_str_len = Int_val(max_str_len_in);
 
   char** c_array = (char**) malloc (size_max * sizeof(char*));
-  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char*));
+  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char));
   for (size_t i=1 ; i<size_max ; ++i) {
     c_array[i] = c_array[i-1] + max_str_len+1;
   }
   for (size_t i=0 ; i<size_max ; ++i) {
-    strcpy(c_array[i], String_val( Field(array, i) ));
+    const char* s = String_val( Field(array, i) );
+    if (strlen(s) > (size_t)max_str_len) {
+      free(c_array[0]); free(c_array);
+      caml_invalid_argument("trexio: string longer than max_str_len");
+    }
+    strcpy(c_array[i], s);
   }
-
-  printf("%d\n", max_str_len);
-  fprintf(stderr,"%d\n", max_str_len);
   trexio_exit_code rc = trexio_write_state_label(file, (const char**) c_array, max_str_len);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array[0]); free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array[0]);
@@ -1672,6 +1720,7 @@ CAMLprim value caml_read_safe_state_file_name(value file_in, value size_max_in, 
   trexio_exit_code rc = trexio_read_state_file_name(file, read_data, max_str_len);
 
   if (rc != TREXIO_SUCCESS) {
+     free(read_data[0]); free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -1696,18 +1745,21 @@ CAMLprim value caml_write_safe_state_file_name(value file_in, value size_max_in,
   int32_t max_str_len = Int_val(max_str_len_in);
 
   char** c_array = (char**) malloc (size_max * sizeof(char*));
-  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char*));
+  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char));
   for (size_t i=1 ; i<size_max ; ++i) {
     c_array[i] = c_array[i-1] + max_str_len+1;
   }
   for (size_t i=0 ; i<size_max ; ++i) {
-    strcpy(c_array[i], String_val( Field(array, i) ));
+    const char* s = String_val( Field(array, i) );
+    if (strlen(s) > (size_t)max_str_len) {
+      free(c_array[0]); free(c_array);
+      caml_invalid_argument("trexio: string longer than max_str_len");
+    }
+    strcpy(c_array[i], s);
   }
-
-  printf("%d\n", max_str_len);
-  fprintf(stderr,"%d\n", max_str_len);
   trexio_exit_code rc = trexio_write_state_file_name(file, (const char**) c_array, max_str_len);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array[0]); free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array[0]);
@@ -1750,11 +1802,14 @@ CAMLprim value caml_read_basis_type(value file, value max_str_len_in)
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_basis_type( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -1909,6 +1964,7 @@ CAMLprim value caml_read_safe_basis_nucleus_index(value file_in, value size_max_
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_basis_nucleus_index_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -1935,6 +1991,7 @@ CAMLprim value caml_write_safe_basis_nucleus_index(value file_in, value size_max
 
   trexio_exit_code rc = trexio_write_safe_basis_nucleus_index_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -1961,6 +2018,7 @@ CAMLprim value caml_read_safe_basis_shell_ang_mom(value file_in, value size_max_
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_basis_shell_ang_mom_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -1987,6 +2045,7 @@ CAMLprim value caml_write_safe_basis_shell_ang_mom(value file_in, value size_max
 
   trexio_exit_code rc = trexio_write_safe_basis_shell_ang_mom_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2013,6 +2072,7 @@ CAMLprim value caml_read_safe_basis_shell_factor(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_shell_factor_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2039,6 +2099,7 @@ CAMLprim value caml_write_safe_basis_shell_factor(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_basis_shell_factor_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2065,6 +2126,7 @@ CAMLprim value caml_read_safe_basis_r_power(value file_in, value size_max_in)
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_basis_r_power_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2091,6 +2153,7 @@ CAMLprim value caml_write_safe_basis_r_power(value file_in, value size_max_in, v
 
   trexio_exit_code rc = trexio_write_safe_basis_r_power_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2117,6 +2180,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_start(value file_in, value size_max
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_basis_nao_grid_start_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2143,6 +2207,7 @@ CAMLprim value caml_write_safe_basis_nao_grid_start(value file_in, value size_ma
 
   trexio_exit_code rc = trexio_write_safe_basis_nao_grid_start_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2169,6 +2234,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_size(value file_in, value size_max_
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_basis_nao_grid_size_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2195,6 +2261,7 @@ CAMLprim value caml_write_safe_basis_nao_grid_size(value file_in, value size_max
 
   trexio_exit_code rc = trexio_write_safe_basis_nao_grid_size_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2221,6 +2288,7 @@ CAMLprim value caml_read_safe_basis_shell_index(value file_in, value size_max_in
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_basis_shell_index_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2247,6 +2315,7 @@ CAMLprim value caml_write_safe_basis_shell_index(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_basis_shell_index_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2273,6 +2342,7 @@ CAMLprim value caml_read_safe_basis_exponent(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_exponent_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2299,6 +2369,7 @@ CAMLprim value caml_write_safe_basis_exponent(value file_in, value size_max_in, 
 
   trexio_exit_code rc = trexio_write_safe_basis_exponent_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2325,6 +2396,7 @@ CAMLprim value caml_read_safe_basis_exponent_im(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_exponent_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2351,6 +2423,7 @@ CAMLprim value caml_write_safe_basis_exponent_im(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_basis_exponent_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2377,6 +2450,7 @@ CAMLprim value caml_read_safe_basis_coefficient(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_coefficient_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2403,6 +2477,7 @@ CAMLprim value caml_write_safe_basis_coefficient(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_basis_coefficient_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2429,6 +2504,7 @@ CAMLprim value caml_read_safe_basis_coefficient_im(value file_in, value size_max
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_coefficient_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2455,6 +2531,7 @@ CAMLprim value caml_write_safe_basis_coefficient_im(value file_in, value size_ma
 
   trexio_exit_code rc = trexio_write_safe_basis_coefficient_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2481,6 +2558,7 @@ CAMLprim value caml_read_safe_basis_oscillation_arg(value file_in, value size_ma
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_oscillation_arg_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2507,6 +2585,7 @@ CAMLprim value caml_write_safe_basis_oscillation_arg(value file_in, value size_m
 
   trexio_exit_code rc = trexio_write_safe_basis_oscillation_arg_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2526,11 +2605,14 @@ CAMLprim value caml_read_basis_oscillation_kind(value file, value max_str_len_in
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_basis_oscillation_kind( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -2565,6 +2647,7 @@ CAMLprim value caml_read_safe_basis_prim_factor(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_prim_factor_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2591,6 +2674,7 @@ CAMLprim value caml_write_safe_basis_prim_factor(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_basis_prim_factor_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2647,6 +2731,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_radius(value file_in, value size_ma
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_nao_grid_radius_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2673,6 +2758,7 @@ CAMLprim value caml_write_safe_basis_nao_grid_radius(value file_in, value size_m
 
   trexio_exit_code rc = trexio_write_safe_basis_nao_grid_radius_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2699,6 +2785,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_phi(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_nao_grid_phi_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2725,6 +2812,7 @@ CAMLprim value caml_write_safe_basis_nao_grid_phi(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_basis_nao_grid_phi_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2751,6 +2839,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_grad(value file_in, value size_max_
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_nao_grid_grad_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2777,6 +2866,7 @@ CAMLprim value caml_write_safe_basis_nao_grid_grad(value file_in, value size_max
 
   trexio_exit_code rc = trexio_write_safe_basis_nao_grid_grad_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2803,6 +2893,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_lap(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_nao_grid_lap_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2829,6 +2920,7 @@ CAMLprim value caml_write_safe_basis_nao_grid_lap(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_basis_nao_grid_lap_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2848,11 +2940,14 @@ CAMLprim value caml_read_basis_interpolator_kind(value file, value max_str_len_i
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_basis_interpolator_kind( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -2887,6 +2982,7 @@ CAMLprim value caml_read_safe_basis_interpolator_phi(value file_in, value size_m
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_interpolator_phi_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2913,6 +3009,7 @@ CAMLprim value caml_write_safe_basis_interpolator_phi(value file_in, value size_
 
   trexio_exit_code rc = trexio_write_safe_basis_interpolator_phi_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2939,6 +3036,7 @@ CAMLprim value caml_read_safe_basis_interpolator_grad(value file_in, value size_
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_interpolator_grad_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -2965,6 +3063,7 @@ CAMLprim value caml_write_safe_basis_interpolator_grad(value file_in, value size
 
   trexio_exit_code rc = trexio_write_safe_basis_interpolator_grad_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -2991,6 +3090,7 @@ CAMLprim value caml_read_safe_basis_interpolator_lap(value file_in, value size_m
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_basis_interpolator_lap_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3017,6 +3117,7 @@ CAMLprim value caml_write_safe_basis_interpolator_lap(value file_in, value size_
 
   trexio_exit_code rc = trexio_write_safe_basis_interpolator_lap_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3065,6 +3166,7 @@ CAMLprim value caml_read_safe_ecp_max_ang_mom_plus_1(value file_in, value size_m
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_ecp_max_ang_mom_plus_1_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3091,6 +3193,7 @@ CAMLprim value caml_write_safe_ecp_max_ang_mom_plus_1(value file_in, value size_
 
   trexio_exit_code rc = trexio_write_safe_ecp_max_ang_mom_plus_1_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3117,6 +3220,7 @@ CAMLprim value caml_read_safe_ecp_z_core(value file_in, value size_max_in)
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_ecp_z_core_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3143,6 +3247,7 @@ CAMLprim value caml_write_safe_ecp_z_core(value file_in, value size_max_in, valu
 
   trexio_exit_code rc = trexio_write_safe_ecp_z_core_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3199,6 +3304,7 @@ CAMLprim value caml_read_safe_ecp_ang_mom(value file_in, value size_max_in)
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_ecp_ang_mom_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3225,6 +3331,7 @@ CAMLprim value caml_write_safe_ecp_ang_mom(value file_in, value size_max_in, val
 
   trexio_exit_code rc = trexio_write_safe_ecp_ang_mom_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3251,6 +3358,7 @@ CAMLprim value caml_read_safe_ecp_nucleus_index(value file_in, value size_max_in
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_ecp_nucleus_index_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3277,6 +3385,7 @@ CAMLprim value caml_write_safe_ecp_nucleus_index(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_ecp_nucleus_index_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3303,6 +3412,7 @@ CAMLprim value caml_read_safe_ecp_exponent(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ecp_exponent_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3329,6 +3439,7 @@ CAMLprim value caml_write_safe_ecp_exponent(value file_in, value size_max_in, va
 
   trexio_exit_code rc = trexio_write_safe_ecp_exponent_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3355,6 +3466,7 @@ CAMLprim value caml_read_safe_ecp_coefficient(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ecp_coefficient_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3381,6 +3493,7 @@ CAMLprim value caml_write_safe_ecp_coefficient(value file_in, value size_max_in,
 
   trexio_exit_code rc = trexio_write_safe_ecp_coefficient_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3407,6 +3520,7 @@ CAMLprim value caml_read_safe_ecp_power(value file_in, value size_max_in)
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_ecp_power_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3433,6 +3547,7 @@ CAMLprim value caml_write_safe_ecp_power(value file_in, value size_max_in, value
 
   trexio_exit_code rc = trexio_write_safe_ecp_power_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3474,11 +3589,14 @@ CAMLprim value caml_read_grid_description(value file, value max_str_len_in)
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_grid_description( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -3633,6 +3751,7 @@ CAMLprim value caml_read_safe_grid_coord(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_grid_coord_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3659,6 +3778,7 @@ CAMLprim value caml_write_safe_grid_coord(value file_in, value size_max_in, valu
 
   trexio_exit_code rc = trexio_write_safe_grid_coord_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3685,6 +3805,7 @@ CAMLprim value caml_read_safe_grid_weight(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_grid_weight_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3711,6 +3832,7 @@ CAMLprim value caml_write_safe_grid_weight(value file_in, value size_max_in, val
 
   trexio_exit_code rc = trexio_write_safe_grid_weight_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3767,6 +3889,7 @@ CAMLprim value caml_read_safe_grid_ang_coord(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_grid_ang_coord_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3793,6 +3916,7 @@ CAMLprim value caml_write_safe_grid_ang_coord(value file_in, value size_max_in, 
 
   trexio_exit_code rc = trexio_write_safe_grid_ang_coord_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3819,6 +3943,7 @@ CAMLprim value caml_read_safe_grid_ang_weight(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_grid_ang_weight_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3845,6 +3970,7 @@ CAMLprim value caml_write_safe_grid_ang_weight(value file_in, value size_max_in,
 
   trexio_exit_code rc = trexio_write_safe_grid_ang_weight_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3901,6 +4027,7 @@ CAMLprim value caml_read_safe_grid_rad_coord(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_grid_rad_coord_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3927,6 +4054,7 @@ CAMLprim value caml_write_safe_grid_rad_coord(value file_in, value size_max_in, 
 
   trexio_exit_code rc = trexio_write_safe_grid_rad_coord_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -3953,6 +4081,7 @@ CAMLprim value caml_read_safe_grid_rad_weight(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_grid_rad_weight_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -3979,6 +4108,7 @@ CAMLprim value caml_write_safe_grid_rad_weight(value file_in, value size_max_in,
 
   trexio_exit_code rc = trexio_write_safe_grid_rad_weight_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4087,6 +4217,7 @@ CAMLprim value caml_read_safe_ao_shell(value file_in, value size_max_in)
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_ao_shell_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4113,6 +4244,7 @@ CAMLprim value caml_write_safe_ao_shell(value file_in, value size_max_in, value 
 
   trexio_exit_code rc = trexio_write_safe_ao_shell_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4139,6 +4271,7 @@ CAMLprim value caml_read_safe_ao_normalization(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_normalization_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4165,6 +4298,7 @@ CAMLprim value caml_write_safe_ao_normalization(value file_in, value size_max_in
 
   trexio_exit_code rc = trexio_write_safe_ao_normalization_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4213,6 +4347,7 @@ CAMLprim value caml_read_safe_ao_1e_int_overlap(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_overlap_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4239,6 +4374,7 @@ CAMLprim value caml_write_safe_ao_1e_int_overlap(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_overlap_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4265,6 +4401,7 @@ CAMLprim value caml_read_safe_ao_1e_int_kinetic(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_kinetic_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4291,6 +4428,7 @@ CAMLprim value caml_write_safe_ao_1e_int_kinetic(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_kinetic_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4317,6 +4455,7 @@ CAMLprim value caml_read_safe_ao_1e_int_potential_n_e(value file_in, value size_
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_potential_n_e_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4343,6 +4482,7 @@ CAMLprim value caml_write_safe_ao_1e_int_potential_n_e(value file_in, value size
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_potential_n_e_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4369,6 +4509,7 @@ CAMLprim value caml_read_safe_ao_1e_int_ecp(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_ecp_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4395,6 +4536,7 @@ CAMLprim value caml_write_safe_ao_1e_int_ecp(value file_in, value size_max_in, v
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_ecp_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4421,6 +4563,7 @@ CAMLprim value caml_read_safe_ao_1e_int_core_hamiltonian(value file_in, value si
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_core_hamiltonian_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4447,6 +4590,7 @@ CAMLprim value caml_write_safe_ao_1e_int_core_hamiltonian(value file_in, value s
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_core_hamiltonian_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4473,6 +4617,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_x(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_dipole_x_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4499,6 +4644,7 @@ CAMLprim value caml_write_safe_ao_1e_int_dipole_x(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_dipole_x_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4525,6 +4671,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_y(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_dipole_y_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4551,6 +4698,7 @@ CAMLprim value caml_write_safe_ao_1e_int_dipole_y(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_dipole_y_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4577,6 +4725,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_z(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_dipole_z_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4603,6 +4752,7 @@ CAMLprim value caml_write_safe_ao_1e_int_dipole_z(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_dipole_z_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4629,6 +4779,7 @@ CAMLprim value caml_read_safe_ao_1e_int_overlap_im(value file_in, value size_max
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_overlap_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4655,6 +4806,7 @@ CAMLprim value caml_write_safe_ao_1e_int_overlap_im(value file_in, value size_ma
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_overlap_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4681,6 +4833,7 @@ CAMLprim value caml_read_safe_ao_1e_int_kinetic_im(value file_in, value size_max
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_kinetic_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4707,6 +4860,7 @@ CAMLprim value caml_write_safe_ao_1e_int_kinetic_im(value file_in, value size_ma
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_kinetic_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4733,6 +4887,7 @@ CAMLprim value caml_read_safe_ao_1e_int_potential_n_e_im(value file_in, value si
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_potential_n_e_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4759,6 +4914,7 @@ CAMLprim value caml_write_safe_ao_1e_int_potential_n_e_im(value file_in, value s
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_potential_n_e_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4785,6 +4941,7 @@ CAMLprim value caml_read_safe_ao_1e_int_ecp_im(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_ecp_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4811,6 +4968,7 @@ CAMLprim value caml_write_safe_ao_1e_int_ecp_im(value file_in, value size_max_in
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_ecp_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4837,6 +4995,7 @@ CAMLprim value caml_read_safe_ao_1e_int_core_hamiltonian_im(value file_in, value
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_core_hamiltonian_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4863,6 +5022,7 @@ CAMLprim value caml_write_safe_ao_1e_int_core_hamiltonian_im(value file_in, valu
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_core_hamiltonian_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4889,6 +5049,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_x_im(value file_in, value size_ma
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_dipole_x_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4915,6 +5076,7 @@ CAMLprim value caml_write_safe_ao_1e_int_dipole_x_im(value file_in, value size_m
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_dipole_x_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4941,6 +5103,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_y_im(value file_in, value size_ma
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_dipole_y_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -4967,6 +5130,7 @@ CAMLprim value caml_write_safe_ao_1e_int_dipole_y_im(value file_in, value size_m
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_dipole_y_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -4993,6 +5157,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_z_im(value file_in, value size_ma
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_ao_1e_int_dipole_z_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5019,6 +5184,7 @@ CAMLprim value caml_write_safe_ao_1e_int_dipole_z_im(value file_in, value size_m
 
   trexio_exit_code rc = trexio_write_safe_ao_1e_int_dipole_z_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -5074,6 +5240,7 @@ CAMLprim value caml_read_ao_2e_int_eri(value file_in, value offset_in, value buf
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5122,6 +5289,7 @@ CAMLprim value caml_write_ao_2e_int_eri(value file_in, value offset_in, value bu
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5159,6 +5327,7 @@ CAMLprim value caml_read_ao_2e_int_eri_lr(value file_in, value offset_in, value 
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5207,6 +5376,7 @@ CAMLprim value caml_write_ao_2e_int_eri_lr(value file_in, value offset_in, value
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5274,6 +5444,7 @@ CAMLprim value caml_read_ao_2e_int_eri_cholesky(value file_in, value offset_in, 
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5322,6 +5493,7 @@ CAMLprim value caml_write_ao_2e_int_eri_cholesky(value file_in, value offset_in,
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5389,6 +5561,7 @@ CAMLprim value caml_read_ao_2e_int_eri_lr_cholesky(value file_in, value offset_i
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5437,6 +5610,7 @@ CAMLprim value caml_write_ao_2e_int_eri_lr_cholesky(value file_in, value offset_
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5482,11 +5656,14 @@ CAMLprim value caml_read_mo_type(value file, value max_str_len_in)
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_mo_type( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -5551,6 +5728,7 @@ CAMLprim value caml_read_safe_mo_coefficient(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_coefficient_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5577,6 +5755,7 @@ CAMLprim value caml_write_safe_mo_coefficient(value file_in, value size_max_in, 
 
   trexio_exit_code rc = trexio_write_safe_mo_coefficient_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -5603,6 +5782,7 @@ CAMLprim value caml_read_safe_mo_coefficient_im(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_coefficient_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5629,6 +5809,7 @@ CAMLprim value caml_write_safe_mo_coefficient_im(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_mo_coefficient_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -5661,6 +5842,7 @@ CAMLprim value caml_read_safe_mo_class(value file_in, value size_max_in, value m
   trexio_exit_code rc = trexio_read_mo_class(file, read_data, max_str_len);
 
   if (rc != TREXIO_SUCCESS) {
+     free(read_data[0]); free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5685,18 +5867,21 @@ CAMLprim value caml_write_safe_mo_class(value file_in, value size_max_in, value 
   int32_t max_str_len = Int_val(max_str_len_in);
 
   char** c_array = (char**) malloc (size_max * sizeof(char*));
-  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char*));
+  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char));
   for (size_t i=1 ; i<size_max ; ++i) {
     c_array[i] = c_array[i-1] + max_str_len+1;
   }
   for (size_t i=0 ; i<size_max ; ++i) {
-    strcpy(c_array[i], String_val( Field(array, i) ));
+    const char* s = String_val( Field(array, i) );
+    if (strlen(s) > (size_t)max_str_len) {
+      free(c_array[0]); free(c_array);
+      caml_invalid_argument("trexio: string longer than max_str_len");
+    }
+    strcpy(c_array[i], s);
   }
-
-  printf("%d\n", max_str_len);
-  fprintf(stderr,"%d\n", max_str_len);
   trexio_exit_code rc = trexio_write_mo_class(file, (const char**) c_array, max_str_len);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array[0]); free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array[0]);
@@ -5730,6 +5915,7 @@ CAMLprim value caml_read_safe_mo_symmetry(value file_in, value size_max_in, valu
   trexio_exit_code rc = trexio_read_mo_symmetry(file, read_data, max_str_len);
 
   if (rc != TREXIO_SUCCESS) {
+     free(read_data[0]); free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5754,18 +5940,21 @@ CAMLprim value caml_write_safe_mo_symmetry(value file_in, value size_max_in, val
   int32_t max_str_len = Int_val(max_str_len_in);
 
   char** c_array = (char**) malloc (size_max * sizeof(char*));
-  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char*));
+  c_array[0] = (char*) malloc (size_max * (max_str_len+1) * sizeof(char));
   for (size_t i=1 ; i<size_max ; ++i) {
     c_array[i] = c_array[i-1] + max_str_len+1;
   }
   for (size_t i=0 ; i<size_max ; ++i) {
-    strcpy(c_array[i], String_val( Field(array, i) ));
+    const char* s = String_val( Field(array, i) );
+    if (strlen(s) > (size_t)max_str_len) {
+      free(c_array[0]); free(c_array);
+      caml_invalid_argument("trexio: string longer than max_str_len");
+    }
+    strcpy(c_array[i], s);
   }
-
-  printf("%d\n", max_str_len);
-  fprintf(stderr,"%d\n", max_str_len);
   trexio_exit_code rc = trexio_write_mo_symmetry(file, (const char**) c_array, max_str_len);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array[0]); free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array[0]);
@@ -5793,6 +5982,7 @@ CAMLprim value caml_read_safe_mo_occupation(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_occupation_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5819,6 +6009,7 @@ CAMLprim value caml_write_safe_mo_occupation(value file_in, value size_max_in, v
 
   trexio_exit_code rc = trexio_write_safe_mo_occupation_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -5845,6 +6036,7 @@ CAMLprim value caml_read_safe_mo_energy(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_energy_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5871,6 +6063,7 @@ CAMLprim value caml_write_safe_mo_energy(value file_in, value size_max_in, value
 
   trexio_exit_code rc = trexio_write_safe_mo_energy_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -5897,6 +6090,7 @@ CAMLprim value caml_read_safe_mo_spin(value file_in, value size_max_in)
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_mo_spin_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5923,6 +6117,7 @@ CAMLprim value caml_write_safe_mo_spin(value file_in, value size_max_in, value a
 
   trexio_exit_code rc = trexio_write_safe_mo_spin_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -5949,6 +6144,7 @@ CAMLprim value caml_read_safe_mo_k_point(value file_in, value size_max_in)
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_mo_k_point_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -5975,6 +6171,7 @@ CAMLprim value caml_write_safe_mo_k_point(value file_in, value size_max_in, valu
 
   trexio_exit_code rc = trexio_write_safe_mo_k_point_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6023,6 +6220,7 @@ CAMLprim value caml_read_safe_mo_1e_int_overlap(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_overlap_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6049,6 +6247,7 @@ CAMLprim value caml_write_safe_mo_1e_int_overlap(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_overlap_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6075,6 +6274,7 @@ CAMLprim value caml_read_safe_mo_1e_int_kinetic(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_kinetic_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6101,6 +6301,7 @@ CAMLprim value caml_write_safe_mo_1e_int_kinetic(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_kinetic_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6127,6 +6328,7 @@ CAMLprim value caml_read_safe_mo_1e_int_potential_n_e(value file_in, value size_
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_potential_n_e_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6153,6 +6355,7 @@ CAMLprim value caml_write_safe_mo_1e_int_potential_n_e(value file_in, value size
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_potential_n_e_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6179,6 +6382,7 @@ CAMLprim value caml_read_safe_mo_1e_int_ecp(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_ecp_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6205,6 +6409,7 @@ CAMLprim value caml_write_safe_mo_1e_int_ecp(value file_in, value size_max_in, v
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_ecp_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6231,6 +6436,7 @@ CAMLprim value caml_read_safe_mo_1e_int_core_hamiltonian(value file_in, value si
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_core_hamiltonian_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6257,6 +6463,7 @@ CAMLprim value caml_write_safe_mo_1e_int_core_hamiltonian(value file_in, value s
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_core_hamiltonian_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6283,6 +6490,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_x(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_dipole_x_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6309,6 +6517,7 @@ CAMLprim value caml_write_safe_mo_1e_int_dipole_x(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_dipole_x_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6335,6 +6544,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_y(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_dipole_y_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6361,6 +6571,7 @@ CAMLprim value caml_write_safe_mo_1e_int_dipole_y(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_dipole_y_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6387,6 +6598,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_z(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_dipole_z_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6413,6 +6625,7 @@ CAMLprim value caml_write_safe_mo_1e_int_dipole_z(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_dipole_z_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6439,6 +6652,7 @@ CAMLprim value caml_read_safe_mo_1e_int_overlap_im(value file_in, value size_max
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_overlap_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6465,6 +6679,7 @@ CAMLprim value caml_write_safe_mo_1e_int_overlap_im(value file_in, value size_ma
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_overlap_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6491,6 +6706,7 @@ CAMLprim value caml_read_safe_mo_1e_int_kinetic_im(value file_in, value size_max
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_kinetic_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6517,6 +6733,7 @@ CAMLprim value caml_write_safe_mo_1e_int_kinetic_im(value file_in, value size_ma
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_kinetic_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6543,6 +6760,7 @@ CAMLprim value caml_read_safe_mo_1e_int_potential_n_e_im(value file_in, value si
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_potential_n_e_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6569,6 +6787,7 @@ CAMLprim value caml_write_safe_mo_1e_int_potential_n_e_im(value file_in, value s
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_potential_n_e_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6595,6 +6814,7 @@ CAMLprim value caml_read_safe_mo_1e_int_ecp_im(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_ecp_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6621,6 +6841,7 @@ CAMLprim value caml_write_safe_mo_1e_int_ecp_im(value file_in, value size_max_in
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_ecp_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6647,6 +6868,7 @@ CAMLprim value caml_read_safe_mo_1e_int_core_hamiltonian_im(value file_in, value
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_core_hamiltonian_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6673,6 +6895,7 @@ CAMLprim value caml_write_safe_mo_1e_int_core_hamiltonian_im(value file_in, valu
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_core_hamiltonian_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6699,6 +6922,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_x_im(value file_in, value size_ma
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_dipole_x_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6725,6 +6949,7 @@ CAMLprim value caml_write_safe_mo_1e_int_dipole_x_im(value file_in, value size_m
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_dipole_x_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6751,6 +6976,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_y_im(value file_in, value size_ma
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_dipole_y_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6777,6 +7003,7 @@ CAMLprim value caml_write_safe_mo_1e_int_dipole_y_im(value file_in, value size_m
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_dipole_y_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6803,6 +7030,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_z_im(value file_in, value size_ma
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_mo_1e_int_dipole_z_im_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6829,6 +7057,7 @@ CAMLprim value caml_write_safe_mo_1e_int_dipole_z_im(value file_in, value size_m
 
   trexio_exit_code rc = trexio_write_safe_mo_1e_int_dipole_z_im_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -6884,6 +7113,7 @@ CAMLprim value caml_read_mo_2e_int_eri(value file_in, value offset_in, value buf
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6932,6 +7162,7 @@ CAMLprim value caml_write_mo_2e_int_eri(value file_in, value offset_in, value bu
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -6969,6 +7200,7 @@ CAMLprim value caml_read_mo_2e_int_eri_lr(value file_in, value offset_in, value 
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7017,6 +7249,7 @@ CAMLprim value caml_write_mo_2e_int_eri_lr(value file_in, value offset_in, value
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7084,6 +7317,7 @@ CAMLprim value caml_read_mo_2e_int_eri_cholesky(value file_in, value offset_in, 
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7132,6 +7366,7 @@ CAMLprim value caml_write_mo_2e_int_eri_cholesky(value file_in, value offset_in,
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7199,6 +7434,7 @@ CAMLprim value caml_read_mo_2e_int_eri_lr_cholesky(value file_in, value offset_i
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7247,6 +7483,7 @@ CAMLprim value caml_write_mo_2e_int_eri_lr_cholesky(value file_in, value offset_
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7399,6 +7636,7 @@ CAMLprim value caml_read_csf_det_coefficient(value file_in, value offset_in, val
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7447,6 +7685,7 @@ CAMLprim value caml_write_csf_det_coefficient(value file_in, value offset_in, va
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7506,6 +7745,7 @@ CAMLprim value caml_read_amplitude_single(value file_in, value offset_in, value 
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7554,6 +7794,7 @@ CAMLprim value caml_write_amplitude_single(value file_in, value offset_in, value
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7591,6 +7832,7 @@ CAMLprim value caml_read_amplitude_single_exp(value file_in, value offset_in, va
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7639,6 +7881,7 @@ CAMLprim value caml_write_amplitude_single_exp(value file_in, value offset_in, v
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7676,6 +7919,7 @@ CAMLprim value caml_read_amplitude_double(value file_in, value offset_in, value 
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7724,6 +7968,7 @@ CAMLprim value caml_write_amplitude_double(value file_in, value offset_in, value
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7761,6 +8006,7 @@ CAMLprim value caml_read_amplitude_double_exp(value file_in, value offset_in, va
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7809,6 +8055,7 @@ CAMLprim value caml_write_amplitude_double_exp(value file_in, value offset_in, v
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7846,6 +8093,7 @@ CAMLprim value caml_read_amplitude_triple(value file_in, value offset_in, value 
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7894,6 +8142,7 @@ CAMLprim value caml_write_amplitude_triple(value file_in, value offset_in, value
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7931,6 +8180,7 @@ CAMLprim value caml_read_amplitude_triple_exp(value file_in, value offset_in, va
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -7979,6 +8229,7 @@ CAMLprim value caml_write_amplitude_triple_exp(value file_in, value offset_in, v
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8016,6 +8267,7 @@ CAMLprim value caml_read_amplitude_quadruple(value file_in, value offset_in, val
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8064,6 +8316,7 @@ CAMLprim value caml_write_amplitude_quadruple(value file_in, value offset_in, va
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8101,6 +8354,7 @@ CAMLprim value caml_read_amplitude_quadruple_exp(value file_in, value offset_in,
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8149,6 +8403,7 @@ CAMLprim value caml_write_amplitude_quadruple_exp(value file_in, value offset_in
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8201,6 +8456,7 @@ CAMLprim value caml_read_safe_rdm_1e(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_rdm_1e_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8227,6 +8483,7 @@ CAMLprim value caml_write_safe_rdm_1e(value file_in, value size_max_in, value ar
 
   trexio_exit_code rc = trexio_write_safe_rdm_1e_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -8253,6 +8510,7 @@ CAMLprim value caml_read_safe_rdm_1e_up(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_rdm_1e_up_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8279,6 +8537,7 @@ CAMLprim value caml_write_safe_rdm_1e_up(value file_in, value size_max_in, value
 
   trexio_exit_code rc = trexio_write_safe_rdm_1e_up_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -8305,6 +8564,7 @@ CAMLprim value caml_read_safe_rdm_1e_dn(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_rdm_1e_dn_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8331,6 +8591,7 @@ CAMLprim value caml_write_safe_rdm_1e_dn(value file_in, value size_max_in, value
 
   trexio_exit_code rc = trexio_write_safe_rdm_1e_dn_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -8357,6 +8618,7 @@ CAMLprim value caml_read_safe_rdm_1e_transition(value file_in, value size_max_in
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_rdm_1e_transition_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8383,6 +8645,7 @@ CAMLprim value caml_write_safe_rdm_1e_transition(value file_in, value size_max_i
 
   trexio_exit_code rc = trexio_write_safe_rdm_1e_transition_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -8416,6 +8679,7 @@ CAMLprim value caml_read_rdm_2e(value file_in, value offset_in, value buffer_siz
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8464,6 +8728,7 @@ CAMLprim value caml_write_rdm_2e(value file_in, value offset_in, value buffer_in
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8501,6 +8766,7 @@ CAMLprim value caml_read_rdm_2e_upup(value file_in, value offset_in, value buffe
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8549,6 +8815,7 @@ CAMLprim value caml_write_rdm_2e_upup(value file_in, value offset_in, value buff
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8586,6 +8853,7 @@ CAMLprim value caml_read_rdm_2e_dndn(value file_in, value offset_in, value buffe
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8634,6 +8902,7 @@ CAMLprim value caml_write_rdm_2e_dndn(value file_in, value offset_in, value buff
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8671,6 +8940,7 @@ CAMLprim value caml_read_rdm_2e_updn(value file_in, value offset_in, value buffe
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8719,6 +8989,7 @@ CAMLprim value caml_write_rdm_2e_updn(value file_in, value offset_in, value buff
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8756,6 +9027,7 @@ CAMLprim value caml_read_rdm_2e_transition(value file_in, value offset_in, value
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8804,6 +9076,7 @@ CAMLprim value caml_write_rdm_2e_transition(value file_in, value offset_in, valu
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8871,6 +9144,7 @@ CAMLprim value caml_read_rdm_2e_cholesky(value file_in, value offset_in, value b
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8919,6 +9193,7 @@ CAMLprim value caml_write_rdm_2e_cholesky(value file_in, value offset_in, value 
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -8986,6 +9261,7 @@ CAMLprim value caml_read_rdm_2e_upup_cholesky(value file_in, value offset_in, va
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9034,6 +9310,7 @@ CAMLprim value caml_write_rdm_2e_upup_cholesky(value file_in, value offset_in, v
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9101,6 +9378,7 @@ CAMLprim value caml_read_rdm_2e_dndn_cholesky(value file_in, value offset_in, va
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9149,6 +9427,7 @@ CAMLprim value caml_write_rdm_2e_dndn_cholesky(value file_in, value offset_in, v
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9216,6 +9495,7 @@ CAMLprim value caml_read_rdm_2e_updn_cholesky(value file_in, value offset_in, va
                                                value_sparse_read, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_read); free(value_sparse_read);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9264,6 +9544,7 @@ CAMLprim value caml_write_rdm_2e_updn_cholesky(value file_in, value offset_in, v
                                                value_sparse_write, size_max);
 
   if (rc != TREXIO_SUCCESS) {
+     free(index_sparse_write); free(value_sparse_write);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9309,11 +9590,14 @@ CAMLprim value caml_read_jastrow_type(value file, value max_str_len_in)
 {
   CAMLparam2(file, max_str_len_in);
   int32_t max_str_len = Int_val(max_str_len_in);
-  char result[max_str_len];
+  char* result = (char*) malloc((size_t) max_str_len);
   trexio_exit_code rc = trexio_read_jastrow_type( File_val(file), result, max_str_len);
   if (rc == TREXIO_SUCCESS) {
-    CAMLreturn ( caml_copy_string(result) );
+    value v = caml_copy_string(result);
+    free(result);
+    CAMLreturn ( v );
   } else {
+    free(result);
     caml_failwith(trexio_string_of_error(rc));
   }
 }
@@ -9438,6 +9722,7 @@ CAMLprim value caml_read_safe_jastrow_en(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_jastrow_en_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9464,6 +9749,7 @@ CAMLprim value caml_write_safe_jastrow_en(value file_in, value size_max_in, valu
 
   trexio_exit_code rc = trexio_write_safe_jastrow_en_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9490,6 +9776,7 @@ CAMLprim value caml_read_safe_jastrow_ee(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_jastrow_ee_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9516,6 +9803,7 @@ CAMLprim value caml_write_safe_jastrow_ee(value file_in, value size_max_in, valu
 
   trexio_exit_code rc = trexio_write_safe_jastrow_ee_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9542,6 +9830,7 @@ CAMLprim value caml_read_safe_jastrow_een(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_jastrow_een_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9568,6 +9857,7 @@ CAMLprim value caml_write_safe_jastrow_een(value file_in, value size_max_in, val
 
   trexio_exit_code rc = trexio_write_safe_jastrow_een_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9594,6 +9884,7 @@ CAMLprim value caml_read_safe_jastrow_en_nucleus(value file_in, value size_max_i
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_jastrow_en_nucleus_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9620,6 +9911,7 @@ CAMLprim value caml_write_safe_jastrow_en_nucleus(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_jastrow_en_nucleus_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9646,6 +9938,7 @@ CAMLprim value caml_read_safe_jastrow_een_nucleus(value file_in, value size_max_
   int64_t* read_data = (int64_t*) malloc (size_max * sizeof(int64_t));
   trexio_exit_code rc = trexio_read_safe_jastrow_een_nucleus_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9672,6 +9965,7 @@ CAMLprim value caml_write_safe_jastrow_een_nucleus(value file_in, value size_max
 
   trexio_exit_code rc = trexio_write_safe_jastrow_een_nucleus_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9728,6 +10022,7 @@ CAMLprim value caml_read_safe_jastrow_en_scaling(value file_in, value size_max_i
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_jastrow_en_scaling_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9754,6 +10049,7 @@ CAMLprim value caml_write_safe_jastrow_en_scaling(value file_in, value size_max_
 
   trexio_exit_code rc = trexio_write_safe_jastrow_en_scaling_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9832,6 +10128,7 @@ CAMLprim value caml_read_safe_qmc_point(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_qmc_point_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9858,6 +10155,7 @@ CAMLprim value caml_write_safe_qmc_point(value file_in, value size_max_in, value
 
   trexio_exit_code rc = trexio_write_safe_qmc_point_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9884,6 +10182,7 @@ CAMLprim value caml_read_safe_qmc_psi(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_qmc_psi_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9910,6 +10209,7 @@ CAMLprim value caml_write_safe_qmc_psi(value file_in, value size_max_in, value a
 
   trexio_exit_code rc = trexio_write_safe_qmc_psi_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9936,6 +10236,7 @@ CAMLprim value caml_read_safe_qmc_e_loc(value file_in, value size_max_in)
   double* read_data = (double*) malloc (size_max * sizeof(double));
   trexio_exit_code rc = trexio_read_safe_qmc_e_loc_64(file, read_data, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(read_data);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -9962,6 +10263,7 @@ CAMLprim value caml_write_safe_qmc_e_loc(value file_in, value size_max_in, value
 
   trexio_exit_code rc = trexio_write_safe_qmc_e_loc_64(file, c_array, size_max);
   if (rc != TREXIO_SUCCESS) {
+     free(c_array);
      caml_failwith(trexio_string_of_error(rc));
   }
   free(c_array);
@@ -9990,6 +10292,7 @@ CAMLprim value caml_read_determinant_list(value file_in, value offset_in, value 
 
   rc = trexio_read_determinant_list (file, offset, &buffer_size, buffer);
   if (rc != TREXIO_SUCCESS) {
+     free(buffer);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -10037,6 +10340,7 @@ CAMLprim value caml_write_determinant_list(value file_in, value offset_in, value
 
   rc = trexio_write_determinant_list (file, offset, buffer_size, buffer);
   if (rc != TREXIO_SUCCESS) {
+     free(buffer);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -10057,6 +10361,7 @@ CAMLprim value caml_read_determinant_coefficient(value file_in, value offset_in,
 
   trexio_exit_code rc = trexio_read_determinant_coefficient (file, offset, &buffer_size, buffer);
   if (rc != TREXIO_SUCCESS) {
+     free(buffer);
      caml_failwith(trexio_string_of_error(rc));
   }
 
@@ -10086,6 +10391,7 @@ CAMLprim value caml_write_determinant_coefficient(value file_in, value offset_in
 
   trexio_exit_code rc = trexio_write_determinant_coefficient (file, offset, buffer_size, buffer);
   if (rc != TREXIO_SUCCESS) {
+     free(buffer);
      caml_failwith(trexio_string_of_error(rc));
   }
 
