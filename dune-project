@@ -37,9 +37,9 @@
 
 (package
  (name conf-trexio)
- (synopsis "TREXIO C library is installed and detectable by pkg-config")
- (description "Virtual package: checks that the TREXIO C library is installed.")
+ (synopsis "TREXIO C library: present (system) or bootstrapped from the vendored source")
+ (description "Ensures the TREXIO C library (headers + libtrexio) is discoverable by pkg-config: uses the system/conda copy if present, otherwise builds the vendored external/trexio-2.6.1.tar.gz statically into the opam switch via setup.sh.")
  (allow_empty)
- (depends (conf-pkg-config :build)))
+ (depends (conf-pkg-config :build) (conf-gcc :build)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

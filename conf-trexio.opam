@@ -2,8 +2,8 @@
 opam-version: "2.0"
 name: "conf-trexio"
 version: "2.6.101"
-synopsis: "TREXIO C library is installed and detectable by pkg-config"
-description: "Virtual package: checks that the TREXIO C library (headers + libtrexio) is installed on the system and discoverable by pkg-config."
+synopsis: "TREXIO C library: present (system) or bootstrapped from the vendored source"
+description: "Ensures the TREXIO C library (headers + libtrexio) is discoverable by pkg-config: uses the system/conda copy if present, otherwise builds the vendored external/trexio-2.6.1.tar.gz statically into the opam switch via setup.sh."
 maintainer: ["Anthony Scemama <scemama@irsamc.ups-tlse.fr>"]
 authors: [
   "Anthony Scemama <scemama@irsamc.ups-tlse.fr>"
@@ -15,9 +15,10 @@ bug-reports: "https://github.com/trex-coe/trexio_ocaml/issues"
 tags: [ "system" "library" ]
 depends: [
   "conf-pkg-config" {build}
+  "conf-gcc" {build}
 ]
 build: [
-  ["pkg-config" "--exists" "trexio"]
+  ["sh" "-c" "pkg-config --exists trexio || ./setup.sh install-c-library \"%{prefix}%\""]
 ]
 dev-repo: "git+https://github.com/trex-coe/trexio_ocaml.git"
 url {

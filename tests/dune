@@ -2,7 +2,10 @@
  (name trexio_tests)
  (modules trexio_tests)
  (libraries trexio unix)
- ; Stage the foreign C stubs (dlltrexio_stubs.so) into dune's runtime C-library
- ; search path so the *byte* executable can dlopen them at test-run time.
- (deps "../trexio.install")
- (modes byte native))
+ (deps ../lib/dlltrexio_stubs.so trexio_tests.bc trexio_tests.exe)
+ (modes byte native)
+ (action
+  (bash
+   "export LD_LIBRARY_PATH=\"../lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\";
+    export CAML_LD_LIBRARY_PATH=\"../lib${CAML_LD_LIBRARY_PATH:+:$CAML_LD_LIBRARY_PATH}\";
+    exec %{test}")))

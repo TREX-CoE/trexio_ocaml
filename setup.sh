@@ -50,16 +50,25 @@ V="${MAJOR}.${MINOR}.$(( PATCH / 100 ))"
 DIR="_fetch/trexio-$V"
 
 # --- shared fetch helper (idempotent, cached under _fetch/) -----------------
+# Offline-first: use the vendored tarball external/trexio-<V>.tar.gz when
+# present; otherwise download the pinned release (release-asset URL only —
+# the tag/source archive has no generated configure and cannot be built).
 fetch() {
   [ -d "$DIR" ] && return
   mkdir -p _fetch
-  URL_PRIMARY="https://github.com/TREX-CoE/trexio/releases/download/v$V/trexio-$V.tar.gz"
-  URL_FALLBACK="https://github.com/TREX-CoE/trexio/archive/refs/tags/v$V.tar.gz"
-  curl -fL --retry 3 -o "_fetch/src.tar.gz" "$URL_PRIMARY" \
-    || curl -fL --retry 3 -o "_fetch/src.tar.gz" "$URL_FALLBACK"
-  tar xzf "_fetch/src.tar.gz" -C _fetch
-  rm -f _fetch/src.tar.gz
-  echo "fetched TREXIO $V release" >&2
+  if [ -f "external/trexio-$V.tar.gz" ]; then
+    if [ -f "external/trexio-$V.tar.gz.sha256" ]; then
+      ( cd external && sha256sum -c "trexio-$V.tar.gz.sha256" ) >&2
+    fi
+    tar xzf "external/trexio-$V.tar.gz" -C _fetch
+    echo "using vendored external/trexio-$V.tar.gz" >&2
+  else
+    URL="https://github.com/TREX-CoE/trexio/releases/download/v$V/trexio-$V.tar.gz"
+    curl -fL --retry 3 -o "_fetch/src.tar.gz" "$URL"
+    tar xzf "_fetch/src.tar.gz" -C _fetch
+    rm -f _fetch/src.tar.gz
+    echo "fetched TREXIO $V release" >&2
+  fi
 }
 
 # --- actions ------------------------------------------------------------------
@@ -86,9 +95,20 @@ install_c_library() {
   fi
   fetch
   cd "$DIR"
-  ./configure --prefix="$prefix" --with-hdf5=yes --without-fortran
+  ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=yes \
+    || ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=no
   make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
   make install
+  # Plain `pkg-config --libs` must be enough to link the static archive:
+  # merge the static (private) deps into the installed .pc Libs line.
+  local pc="$prefix/lib/pkgconfig/trexio.pc"
+  if [ -f "$pc" ]; then
+    local libs
+    libs="$(PKG_CONFIG_PATH="$prefix/lib/pkgconfig" pkg-config --libs --static trexio 2>/dev/null || true)"
+    if [ -n "$libs" ]; then
+      sed -i "s|^Libs:.*|Libs: $libs|" "$pc"
+    fi
+  fi
   cd -
   echo "TREXIO C library installed to: $prefix  (use PKG_CONFIG_PATH=\"\$prefix/lib/pkgconfig\")" >&2
 }
