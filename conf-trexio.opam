@@ -18,6 +18,9 @@ depends: [
   "conf-gcc" {build}
 ]
 build: [
+  ["sh" "-c" "pkg-config --exists trexio || ./setup.sh build-c-library \"%{prefix}%\""]
+]
+install: [
   ["sh" "-c" "pkg-config --exists trexio || ./setup.sh install-c-library \"%{prefix}%\""]
 ]
 dev-repo: "git+https://github.com/trex-coe/trexio_ocaml.git"

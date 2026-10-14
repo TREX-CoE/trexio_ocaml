@@ -2,23 +2,31 @@
 # setup.sh — optional TREXIO C-library bootstrap.
 #
 # Interface:
-#   ./setup.sh install-c-library <prefix>   # one-shot bootstrap of the TREXIO C library
+#   ./setup.sh build-c-library [prefix]     # fetch + configure + make (no install)
+#   ./setup.sh install-c-library <prefix>   # build-c-library + make install + .pc fixup
 #
 # Code generation lives in ./update.sh (the single owner of fetch + regenerate);
-# it is NOT called by the opam build, and neither is this script: the OCaml
-# package is built from the committed generated files.
+# it is NOT called by the opam build — the trexio package builds from the
+# committed generated files. This script IS called by the conf-trexio package
+# when no C library is found via pkg-config (build: = build-c-library,
+# install: = install-c-library), and it is the `make bootstrap` entry point too.
 #
-# The C library is NEVER compiled as part of the OCaml build — it must be
-# pre-installed (distro package, conda-forge 'trexio', nix, or this script),
-# and dune-configurator resolves its compile/link flags via `pkg-config trexio`.
+# The OCaml binding's own dune build never compiles the C library: it is
+# either pre-installed (distro package, conda-forge 'trexio', nix, or a
+# previous bootstrap) or built by conf-trexio (this script) from the vendored
+# external/ tarball, and dune-configurator resolves its flags via
+# `pkg-config trexio`.
 #
 # Versioning (Rust-binding convention, cf. trexio-rs): the dune-project
 # version is the single source of truth.  2.6.1NN  ==  TREXIO C library 2.6.1
 # + binding revision NN.  The C-library tag used for downloads is derived as
 #   MAJOR.MINOR.(PATCH / 100),   e.g.  2.6.101 -> 2.6.1.
 #
-# Requirements: bash, sed, cut, curl, tar, autotools (autoconf/automake/libtool,
-# gcc), HDF5 development headers, and network access to github.com.
+# Requirements: bash, sed, cut, tar, a C compiler + make; HDF5 development
+# headers are optional (without them the C library is built TEXT-only);
+# curl + network access to github.com only when external/trexio-<V>.tar.gz
+# is not vendored. The release tarball ships a pre-generated configure, so
+# no autotools packages are needed.
 
 set -euo pipefail
 
@@ -26,7 +34,8 @@ cd "$(dirname "$0")"
 
 usage() {
   cat >&2 <<EOF
-usage: $(basename "$0") install-c-library <prefix>
+usage: $(basename "$0") build-c-library [prefix]
+       $(basename "$0") install-c-library <prefix>
 EOF
   exit 1
 }
@@ -72,13 +81,11 @@ fetch() {
 }
 
 # --- actions ------------------------------------------------------------------
-install_c_library() {
-  # Optional bootstrap (dev/CI); intended use:
-  #   ./setup.sh install-c-library $PWD/_prefix
-  # then:  export PKG_CONFIG_PATH="$_prefix/lib/pkgconfig"
-  #        export LD_LIBRARY_PATH="$_prefix/lib"
-  #
-  # NOT called by the opam build — the OCaml package never compiles the C lib.
+build_c_library() {
+  # Fetch (offline-first from external/) + configure + make; NO install.
+  # This is what conf-trexio's opam build: stanza runs: the opam 2.x build
+  # sandbox makes the destination prefix read-only during build, so nothing
+  # here may write outside the build directory.
   #
   # Uses the release tarball's canonical autotools build (./configure + make):
   # the CMake build system shipped in TREXIO 2.6.1 has no pkg-config install
@@ -88,17 +95,48 @@ install_c_library() {
   # one that satisfies the dependency model.  Flags mirror the intended
   # CMake configuration of the plan: HDF5 ON, Fortran OFF, no Python, no
   # tests executed.
+  #
+  # The install step also passes `make install prefix=...` as a
+  # belt-and-braces override of the install location.
+  local prefix="${1:-/usr/local}"
+  fetch
+  cd "$DIR"
+  configure_if_needed "$prefix"
+  make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+}
+
+# Re-runs ./configure only when there is no Makefile or when the Makefile
+# was configured for a different --prefix. The installed trexio.pc has its
+# libdir substituted at configure time (config.status), so the prefix baked
+# into the tree must match the prefix being installed to; a stale Makefile
+# from a previous bootstrap (possibly with a different prefix) then triggers
+# a re-configure. In the common cases nothing happens: the conf-trexio
+# install: stanza finds the Makefile that the build: stanza configured for
+# the same prefix, and make afterwards does nothing.
+configure_if_needed() {
+  local prefix="$1"
+  local cur=""
+  if [ -f Makefile ]; then
+    cur="$(sed -n 's/^prefix *= *//p' Makefile | head -1)"
+  fi
+  [ "$cur" = "$prefix" ] && return 0
+  ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=yes \
+    || ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=no
+}
+
+install_c_library() {
+  # One-shot bootstrap: `make bootstrap`, CI, or the conf-trexio opam
+  # install: stanza (which runs with a writable prefix, unlike build:).
+  # Intended use:
+  #   ./setup.sh install-c-library $PWD/_prefix
+  # then:  export PKG_CONFIG_PATH="$_prefix/lib/pkgconfig"
   local prefix="${1:-}"
   if [ -z "$prefix" ]; then
     echo "usage: ./setup.sh install-c-library <prefix>" >&2
     exit 1
   fi
-  fetch
-  cd "$DIR"
-  ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=yes \
-    || ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=no
-  make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
-  make install
+  build_c_library "$prefix"
+  make install prefix="$prefix"
   # Plain `pkg-config --libs` must be enough to link the static archive:
   # merge the static (private) deps into the installed .pc Libs line.
   local pc="$prefix/lib/pkgconfig/trexio.pc"
@@ -114,6 +152,7 @@ install_c_library() {
 }
 
 case "${1:-}" in
+  build-c-library)    shift; build_c_library "${1:-}" ;;
   install-c-library)  shift; install_c_library "${1:-}" ;;
   codegen)
     echo "setup.sh: 'codegen' moved to ./update.sh" >&2
