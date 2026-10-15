@@ -32,8 +32,10 @@ _opam/
 __pycache__/
 # fetched TREXIO release tarball + extraction (update.sh / setup.sh)
 _fetch/
-# bootstrapped C-library prefix (setup.sh install-c-library)
+# bootstrapped C-library prefix (setup.sh install-c-library; dev `make bootstrap`)
 _prefix/
+# C-library prefix the opam record's build: step installs into the package root
+_c-prefix/
 # test artifacts (dune @runtest writes tmp_<pid>/ under the CWD)
 tmp/
 tmp_*/

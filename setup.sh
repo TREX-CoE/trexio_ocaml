@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — TREXIO C-library bootstrap (`make bootstrap` / conf-trexio).
+# setup.sh — TREXIO C-library bootstrap (make bootstrap / the opam record).
 #
 #   ./setup.sh build-c-library [prefix]     # fetch + configure + make (no install)
 #   ./setup.sh install-c-library <prefix>   # build-c-library + make install + .pc fixup
@@ -55,14 +55,23 @@ fetch() {
   fi
 }
 
-# --- build: the conf-trexio build stanza (opam 2.x makes the prefix read-only
-#     during build:, so everything stays inside the build directory). The
-#     autotools build is required (not the tarball's CMake): only it installs
-#     trexio.pc (Makefile.am: pkgconfig_DATA = pkgconfig/trexio.pc). ----------
+# --- build: the trexio record's build: stanza (opam 2.x makes the prefix
+#     read-only during build:, so everything stays inside the build directory).
+#     The autotools build is required (not the tarball's CMake): only it
+#     installs trexio.pc (Makefile.am: pkgconfig_DATA = pkgconfig/trexio.pc).
 build_c_library() {
   local prefix="${1:-/usr/local}"
   fetch
   cd "$DIR"
+  # The v2.6.1 configure probes the Fortran compiler unconditionally
+  # (AC_FC_FREEFORM) and hard-fails when no free-form flag works:
+  # "Fortran does not accept free-form source" (newer gfortran, e.g. the
+  # opam-ci images). Fortran is never built (--without-fortran), so
+  # neutralize the fatal. With a future configure without this fatal the
+  # substitution matches nothing and is a no-op.
+  sed -i.bak \
+    -e 's|^  as_fn_error 77 "Fortran does not accept free-form source" .*|  : # fortran free-form probe failed; harmless (Fortran is not built: --without-fortran)|' \
+    configure && rm -f configure.bak
   configure_if_needed "$prefix"
   make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
 }
@@ -80,8 +89,8 @@ configure_if_needed() {
     || ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=no
 }
 
-# --- install: one-shot bootstrap (make bootstrap, CI, or the conf-trexio
-#     install: stanza, which runs with a writable prefix). -----------------------
+# --- install: one-shot bootstrap (make bootstrap, CI, or the trexio record's
+#     install: stanza, which runs with a writable prefix). -----------------
 install_c_library() {
   local prefix="${1:-}"
   [ -n "$prefix" ] || { echo "usage: ./setup.sh install-c-library <prefix>" >&2; exit 1; }

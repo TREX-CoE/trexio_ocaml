@@ -16,13 +16,13 @@ homepage: "https://github.com/trex-coe/trexio_ocaml"
 doc: "https://trex-coe.github.io/trexio/"
 bug-reports: "https://github.com/trex-coe/trexio_ocaml/issues"
 depends: [
-  "conf-trexio"
   "dune" {>= "3.1"}
   "dune-configurator" {build}
   "conf-pkg-config" {build}
   "odoc" {with-doc}
 ]
 build: [
+  ["sh" "-c" "pkg-config --atleast-version=2.6.1 trexio || ./setup.sh install-c-library \"$(pwd)/_c-prefix\""]
   [
     "dune"
     "build"
@@ -34,6 +34,7 @@ build: [
   ]
 ]
 install: [
+  ["sh" "-c" "pkg-config --atleast-version=2.6.1 trexio || ./setup.sh install-c-library \"%{prefix}%\""]
   ["dune" "install"]
 ]
 dev-repo: "git+https://github.com/trex-coe/trexio_ocaml.git"

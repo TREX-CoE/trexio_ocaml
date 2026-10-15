@@ -117,7 +117,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git diff --stat -- lib trex.json
   git diff --cached --stat -- lib trex.json
   echo "Review: if the TREXIO C API changed, commit the files above together" >&2
-  echo "with the version bump (dune-project + trexio.opam + conf-trexio.opam)" >&2
+  echo "with the version bump (dune-project + trexio.opam)" >&2
   echo "as one change. Before committing, verify the user-facing path with:" >&2
   echo "  opam install . --with-test    # C library resolvable via pkg-config" >&2
 else

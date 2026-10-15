@@ -24,17 +24,18 @@ jobs:
             build-essential pkg-config libhdf5-dev
 
       # Build the TREXIO C library from the pinned (vendored) release into
-      # /usr/local — this leg exercises the "system C library preferred"
+      # /usr — this leg exercises the "system C library preferred"
       # path of the in-tree build.
       - name: Build and install the TREXIO C library
         run: |
-          sudo ./setup.sh install-c-library /usr/local
+          sudo ./setup.sh install-c-library /usr
           sudo ldconfig
           pkg-config --modversion trexio
 
       # OCaml in a fresh switch. The deps are installed via
-      # `opam install . --deps-only` (runs the conf-trexio C-library check)
-      # and the binding is then built + tested in-tree: a full in-tree
+      # `opam install . --deps-only` (dune, dune-configurator,
+      # conf-pkg-config) and the binding is then built + tested in-tree
+      # against the system C library (/usr): a full in-tree
       # `opam install .` does not work, because setup-ocaml nests its opam
       # root inside the workspace and that breaks dune (opam 2.6.1).
       - name: Set up OCaml
@@ -42,8 +43,8 @@ jobs:
         with:
           ocaml-compiler: 5
 
-      # Runs the conf-trexio build step (pkg-config check); installs dune,
-      # dune-configurator, conf-pkg-config.
+      # Installs the binding's dependencies (dune, dune-configurator,
+      # conf-pkg-config); the C library is the system one built above.
       - name: Install dependency packages
         run: opam install . --deps-only --with-test -y
 
@@ -63,11 +64,13 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------
-  # Bootstrap leg: the machine has NO TREXIO C library. conf-trexio must
-  # then compile the vendored external/trexio-<V>.tar.gz statically
-  # (build: stanza; the tarball is self-contained) and install it into
-  # the switch (install: stanza); the binding must build + test against
-  # it, found via the discover.ml switch fallback.
+  # Bootstrap leg: the machine has NO TREXIO C library. The opam
+  # record's build: stanza then bootstraps the vendored
+  # external/trexio-<V>.tar.gz statically into <root>/_c-prefix
+  # (offline, self-contained); the binding builds + tests against it,
+  # found via the discover.ml local fallback. (The record's install:
+  # stanza puts a copy into the switch; that path is exercised on CI by
+  # the record itself.)
   # ---------------------------------------------------------------
   build-and-test-bootstrap:
     name: Build & Test (no system C lib - bootstrap, ubuntu-latest)
@@ -95,33 +98,34 @@ jobs:
         with:
           ocaml-compiler: 5
 
-      # Install the pinned conf-trexio BY NAME (setup-ocaml pins it as
-      # `conf-trexio.dev`): `opam install . --deps-only` would skip it —
-      # every .opam record in the worktree is a "project" package and
-      # --deps-only never builds project packages, so the bootstrap would
-      # not run. dune + dune-configurator are listed explicitly: a conf
-      # package brings no OCaml toolchain, and the in-tree build needs it.
-      - name: Install conf-trexio (bootstraps the C library into the switch)
-        run: opam install conf-trexio.dev dune dune-configurator --with-test -y
+      # Toolchain only — no C-library package is involved any more: the
+      # binding bootstraps the C library from its own vendored tarball
+      # (the next step runs the record's build: stanza verbatim). dune +
+      # dune-configurator are listed explicitly: a conf package brings no
+      # OCaml toolchain, and the in-tree build needs it.
+      - name: Install the toolchain
+        run: opam install dune dune-configurator conf-pkg-config --with-test -y
 
-      # discover.ml resolves the C library via pkg-config, falling back to
-      # <switch>/lib/pkgconfig/trexio.pc.
+      # discover.ml prefers a system library (API floor checked), then
+      # finds the bootstrapped ./_c-prefix installed by the step above.
+      - name: Bootstrap the C library (the record's build: stanza, verbatim)
+        run: |
+          sh -c 'pkg-config --atleast-version=2.6.1 trexio || \
+                 ./setup.sh install-c-library "$(pwd)/_c-prefix"'
+
       - name: Build, install and test the binding with dune
         run: |
           opam exec -- dune build @install
           opam exec -- dune install
           opam exec -- dune build @runtest --verbose
 
-      - name: Verify the bootstrap installed a static C library into the switch
+      - name: Verify the bootstrap produced a static C library
         run: |
-          opam exec -- sh -c '
-            P="$(ocamlc -where | sed "s|/lib/ocaml$||")"
-            ls "$P/lib" | grep -x libtrexio.a
-            test -z "$(ls "$P/lib" | grep "^libtrexio\.so" || true)"
-            test -f "$P/lib/pkgconfig/trexio.pc"
-            grep -q "$P/lib" _build/default/lib/c_library_flags.sexp
-            echo "OK: static bootstrap C library in the switch ($P), used by the in-tree build"
-          '
+          test -f _c-prefix/lib/libtrexio.a
+          test -z "$(ls _c-prefix/lib | grep '^libtrexio\.so' || true)"
+          test -f _c-prefix/lib/pkgconfig/trexio.pc
+          grep -q "_c-prefix/lib" _build/default/lib/c_library_flags.sexp
+          echo "OK: static bootstrapped C library in _c-prefix, used by the in-tree build"
 
       - name: Upload build artifacts on failure
         if: failure()
@@ -138,16 +142,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: check dune-project / trexio.opam / conf-trexio.opam agree and follow the convention
+      - name: check dune-project and trexio.opam agree and follow the convention
         run: |
           set -e
           PV=$(sed -n 's/.*version \([0-9.][0-9.]*\).*/\1/p' dune-project | head -1)
           PATCH=$(echo "$PV" | cut -d. -f3)
           [ "$PATCH" -ge 100 ] || { echo "patch component must be 3 digits (2.6.1NN), got $PV"; exit 1; }
-          grep -q "version: \"${PV}\"" trexio.opam  || { echo "trexio.opam";    exit 1; }
-          grep -q "version: \"${PV}\"" conf-trexio.opam \
-                                             || { echo "conf-trexio.opam"; exit 1; }
-          echo "all versions = $PV (C library = $PV with last two digits ignored)"
+          grep -q "version: \"${PV}\"" trexio.opam || { echo "trexio.opam"; exit 1; }
+          echo "versions OK: $PV (C library = $PV with last two digits ignored)"
 
   # ----------------------------------------
   # Non-blocking reminder when a new release

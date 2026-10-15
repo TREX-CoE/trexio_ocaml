@@ -29,16 +29,8 @@
   dune
   (dune-configurator :build)
   (conf-pkg-config :build)
-  conf-trexio
   (odoc :with-doc))
  (tags
   ("Quantum chemistry" "Library"))
 )
-
-(package
- (name conf-trexio)
- (synopsis "TREXIO C library: present (system) or bootstrapped from the vendored source")
- (description "Ensures the TREXIO C library (headers + libtrexio) is discoverable by pkg-config: uses the system/conda copy if present, otherwise builds the vendored external/trexio-2.6.1.tar.gz statically into the opam switch via setup.sh.")
- (allow_empty)
- (depends (conf-pkg-config :build) (conf-gcc :build)))
 

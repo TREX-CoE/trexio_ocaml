@@ -9,13 +9,12 @@
 
 - Follow the **released** C tarball only — never the C repository's `master`.
 - Binding version `A.B.CNN` = C release `A.B.C` + revision `NN` (patch always
-  3 digits). `dune-project` is the source of truth; `trexio.opam` and
-  `conf-trexio.opam` must state the same version (enforced by `read_json.py`
-  and the `versions` CI job).
+  3 digits). `dune-project` is the source of truth; `trexio.opam` must state
+  the same version (enforced by `read_json.py` and the `versions` CI job).
 - The generated files (`lib/trexio.ml|.mli|.c`) and `trex.json` are
   **committed**. `./update.sh` is the only place that fetches or regenerates.
 - The C release tarball is **vendored** in `external/` (+ `.sha256`): the
-  bootstrap (`make bootstrap`, `conf-trexio` at `opam install` time) is
+  bootstrap (`make bootstrap`, the `trexio` record at `opam install` time) is
   offline-first from it. `./update.sh` still fetches over the network
   (cached under `_fetch/`).
 - **Never hand-edit `lib/`** — fix the `src/` templates or `read_json.py`
@@ -25,9 +24,8 @@
 
 1. New C release `A.B.C` → first revision `A.B.001`; later binding-only
    fixes keep bumping the revision.
-2. Write the version into all **three** files: `dune-project`, `trexio.opam`,
-   `conf-trexio.opam` (the C tag is derived automatically: `2.7.001` →
-   `v2.7.0`).
+2. Write the version into both files: `dune-project` and `trexio.opam` (the
+   C tag is derived automatically: `2.7.001` → `v2.7.0`).
 3. **Replace the vendored tarball**: store the new release-asset tarball as
    `external/trexio-<Ctag>.tar.gz` (delete the old one) and regenerate its
    checksum:
@@ -67,22 +65,27 @@ git diff -- lib/        # what OCaml users get: the API surface
 ## Step 4 — gate (before committing)
 
 1. `dune build @runtest` green, and **no `SKIP HDF5`**.
-2. `opam lint trexio.opam conf-trexio.opam` clean.
-3. Hermetic install from a clean switch:
+2. `opam lint trexio.opam` clean.
+3. Hermetic install from a clean switch (works without any system C
+   library — the bootstrap leg):
 
    ```sh
-   opam remove -y trexio conf-trexio
+   opam pin remove -y trexio 2>/dev/null || true
+   opam pin add -y trexio .            # some opam versions install it here; harmless
+   opam remove -y trexio 2>/dev/null || true
    rm -rf <switch>/.opam-switch/{build,backup,overlay}   # force a real build
-   opam install . --with-test -y
+   opam install -y --with-test trexio  # the pin makes this build the checkout
    ```
 
-4. **Negative test:** with no C library in scope, the build must fail at
-   `conf-trexio` — beware an ambient `PKG_CONFIG_PATH`/`LD_LIBRARY_PATH`
-   pointing at a stray TREXIO making this pass for the wrong reason.
+4. **Bootstrap test:** with no C library in scope, the record's build step
+   must build the vendored tarball (log line `using vendored
+   external/trexio-<V>.tar.gz`) and the suite must still pass — beware an
+   ambient `PKG_CONFIG_PATH`/`LD_LIBRARY_PATH` pointing at a stray TREXIO
+   taking the system path instead.
 
 ## Step 5 — commit, tag, push
 
-One commit: version bump (three files) + new `external/` tarball + `trex.json`
+One commit: version bump (two files) + new `external/` tarball + `trex.json`
 + `lib/` + any test fixes. Local tag `vA.B.CNN` (informational — this repo
 does not use `dune subst`). Push; CI must be green, in particular the
 `versions` job and `watch-release` (its warning clears once the pinned C
@@ -96,22 +99,23 @@ and potentially prepare everything on the local machine, so that humans can
 proceed easly with this step.
 
 Open one PR to [ocaml/opam-repository](https://github.com/ocaml/opam-repository)
-bumping **both** records — `trexio` *and* `conf-trexio` — to the new version
-together. That is the moment `opam update && opam install trexio` reaches the
-new code for users. (If the records are not published yet, the upgrade is
-part of the initial submission.)
+bumping the `trexio` record to the new version. That is the moment
+`opam update && opam install trexio` reaches the new code for users.
+(If the record is not published yet, the upgrade is part of the initial
+submission.)
 
 ## Variant: binding-only fix (no new C release)
 
-Bump the revision in the three version files → `./update.sh` (expect **zero
+Bump the revision in the two version files → `./update.sh` (expect **zero
 diff** in `lib/` + `trex.json`) → make the fix → Steps 4–6.
 
 ## Invariants — keep in every upgrade
 
 - No hand-editing the committed generated files in `lib/`.
-- No network, python3, or C compilation in the `opam install` path.
-- Released tarballs only; `dune-project`, `trexio.opam`, `conf-trexio.opam`
-  always agree.
+- No network or python3 in the `opam install` path; the only C compilation
+  there is the bootstrap of the vendored TREXIO C library (skipped when a
+  suitable system library is present).
+- Released tarballs only; `dune-project` and `trexio.opam` always agree.
 
 ## Troubleshooting
 

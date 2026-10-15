@@ -41,26 +41,20 @@ def check_version():
           "(2.6.101). A bare C-library version such as 2.6.1 is not a valid\n"
           "binding version.\n" % dune_version)
 
-    # Every opam record that exists must carry the same version.
-    # (conf-trexio.opam is created by a later task; its absence is not an error.)
-    for opam in ("trexio.opam", "conf-trexio.opam"):
-       if not os.path.exists(opam):
-          if opam == "trexio.opam":
-             fail("opam file %s not found" % opam)
-          print("note: %s is not present yet; skipping its version check"
-                % opam, file=sys.stderr)
-          continue
-       with open(opam,'r') as f:
-          for line in f:
-             if line.startswith("version:"):
-                opam_version = line.split()[1].strip().strip('"')
-                break
-          else:
-             fail("%s: no version: line found" % opam)
-       if opam_version != dune_version:
-          fail("Inconsistent versions:\n"
-               "dune-project: %s\n%s: %s\n"
-               % (dune_version, opam, opam_version))
+    # The opam record must carry the same version.
+    if not os.path.exists("trexio.opam"):
+       fail("opam file trexio.opam not found")
+    with open("trexio.opam","r") as f:
+       for line in f:
+          if line.startswith("version:"):
+             opam_version = line.split()[1].strip().strip('"')
+             break
+       else:
+          fail("trexio.opam: no version: line found")
+    if opam_version != dune_version:
+       fail("Inconsistent versions:\n"
+            "dune-project: %s\n%s: %s\n"
+            % (dune_version, "trexio.opam", opam_version))
 
 def write_stubs(data):
 

@@ -5,21 +5,22 @@ file format and C library for wave functions and quantum-chemistry integrals.
 
 ## What this is
 
-Two OPAM records: `trexio` (the binding, C stubs over the TREXIO C library)
-and `conf-trexio` (provision package).
+One OPAM record: `trexio` (the binding: C stubs over the TREXIO C library).
 
-`opam install trexio` works out of the box: if `pkg-config --exists trexio`
-already succeeds (system, conda, nix, …) that installation is used; otherwise
-`conf-trexio` builds the **vendored** `external/trexio-<Ctag>.tar.gz`
-**statically into the switch, offline**.
-A pre-installed C library is always preferred.
+`opam install trexio` works out of the box: if `pkg-config
+--atleast-version=2.6.1 trexio` already succeeds (system 2.6.1+, conda, nix,
+…) that installation is used; otherwise the record builds the **vendored**
+`external/trexio-<Ctag>.tar.gz` **statically, offline** — into `./_c-prefix`
+during `build:` (used by the build) and into the opam switch during
+`install:` (persists for later).
+A suitable system C library is always preferred.
 
 ## Versioning
 
 Binding version `A.B.CNN` = TREXIO release `A.B.C` + binding revision `NN`
 (same convention as the TREXIO Rust binding); e.g. `2.6.101` = TREXIO `2.6.1`,
-OCaml revision `01`. `dune-project` is the single source of truth; the two `.opam`
-files must always state the same version.
+OCaml revision `01`. `dune-project` is the single source of truth; the `.opam`
+file must always state the same version.
 
 ## Installation
 
@@ -40,7 +41,7 @@ make install                   # into the current OPAM switch
 
 ## Upgrading to a new TREXIO C release (for maintainers)
 
-1. Bump the binding version in `dune-project` **and** both `.opam` files.
+1. Bump the binding version in `dune-project` and `trexio.opam`.
 2. Replace `external/trexio-<Ctag>.tar.gz` with the new release and
    regenerate its `.sha256`:
    `cd external && sha256sum trexio-<Ctag>.tar.gz > trexio-<Ctag>.tar.gz.sha256`.
@@ -64,13 +65,13 @@ troubleshooting): [UPGRADING.md](UPGRADING.md).
 
 ```
 dune-project               # package/version definitions (source of truth)
-trexio.opam, conf-trexio.opam
+trexio.opam
 trex.json                  # generator input (committed; refreshed by ./update.sh)
 src/                       # hand-written binding templates (code-gen markers)
 lib/                       # generated + committed sources (+ dune-configurator setup)
 read_json.py               # generator: trex.json + src/ -> lib/
 update.sh                  # fetch + regenerate + test (only place that fetches)
-setup.sh                   # C bootstrap (make bootstrap / conf-trexio): offline, static
+setup.sh                   # C bootstrap (make bootstrap / opam build step): offline, static
 external/                  # vendored TREXIO C tarball + .sha256
 Makefile                   # dev convenience targets
 ```
