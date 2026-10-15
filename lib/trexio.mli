@@ -1,12 +1,3 @@
-(*
-(** Constants *)
-val package_version : string
-val version_major   : int
-val version_minor   : int
-val version_patch   : int
-val git_hash        : string
-*)
-
 (** Open/close *)
 
 type trexio_file
@@ -839,5 +830,3 @@ val write_determinant_list : trexio_file -> offset:int -> (bytes * bytes) array 
 
 val read_determinant_coefficient : trexio_file -> offset:int -> buffer_size:int -> float array
 val write_determinant_coefficient : trexio_file -> offset:int -> float array -> unit
-
-

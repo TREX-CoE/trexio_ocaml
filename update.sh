@@ -1,41 +1,22 @@
 #!/usr/bin/env bash
-# update.sh — the ONLY place that fetches or generates binding code:
-# derive the TREXIO C tag from dune-project (A.B.1NN -> A.B.(P/100)), fetch
-# the release tarball (cached under _fetch/), assert the tarball's version,
-# refresh trex.json, regenerate lib/ from the src/ templates, then run
-# `dune build @runtest` — so a broken regeneration fails here, not later.
-# It ends with a git status/diff summary of lib/ + trex.json for review.
-#
-# Requirements: bash, sed, cut, curl, tar, python3 (network only when
-# _fetch/trexio-<tag> is not cached); the final `dune build @runtest` also
-# needs a TREXIO C library resolvable via pkg-config (`make bootstrap`
-# provides ./_prefix, which is picked up automatically below). Since the
-# generated files are committed, `opam install .` needs neither network
-# access nor python3.
+# update.sh — the only place that fetches or generates binding code:
+# derive the C tag from dune-project (A.B.1NN -> A.B.(P/100)), fetch the
+# release tarball (cached under _fetch/), assert its version, refresh
+# trex.json, regenerate lib/ from the src/ templates, run the test suite —
+# a broken regeneration fails here, not later.
 
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
-usage() {
-  cat >&2 <<EOF
-usage: $(basename "$0")          # no arguments
-EOF
-  exit 1
-}
-[ "$#" -eq 0 ] || usage
+[ "$#" -eq 0 ] || { echo "usage: $(basename "$0")   (no arguments)" >&2; exit 1; }
 
-# --- required tools ------------------------------------------------------------
 for tool in curl tar python3 sed cut dune; do
   command -v "$tool" >/dev/null 2>&1 \
     || { echo "update.sh: missing required tool: $tool" >&2; exit 1; }
 done
 
-# --- C tag derived from the dune-project version -------------------------------
-# Versioning (Rust-binding convention, cf. trexio-rs): the dune-project
-# version is the single source of truth.  2.6.1NN  ==  TREXIO C library 2.6.1
-# + binding revision NN.  The C-library tag is derived as
-#   MAJOR.MINOR.(PATCH / 100),   e.g.  2.6.101 -> 2.6.1.
+# --- C tag derived from the dune-project version --------------------------------
 [ -f dune-project ] || {
   echo "update.sh: no dune-project in $(pwd)" >&2; exit 1; }
 PV=$(sed -n 's/.*version \([0-9.][0-9.]*\).*/\1/p' dune-project | head -1)
@@ -44,16 +25,14 @@ MINOR=$(echo "$PV" | cut -d. -f2)
 PATCH=$(echo "$PV" | cut -d. -f3)
 is_num() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac }
 if ! { is_num "$MAJOR" && is_num "$MINOR" && is_num "$PATCH" && [ "${#PATCH}" -ge 3 ]; }; then
-  echo "update.sh: dune-project version '${PV:-<not found>}' does not follow the" >&2
-  echo "           binding versioning convention (Rust-binding style):" >&2
-  echo "           MAJOR.MINOR.PATCHR[R]  ==  TREXIO C MAJOR.MINOR.(PATCH/100) + revision RR," >&2
-  echo "           e.g. 2.6.101 = TREXIO C library 2.6.1 + binding revision 01" >&2
+  echo "update.sh: dune-project version '${PV:-<not found>}' must follow the" >&2
+  echo "           A.B.1NN binding convention (e.g. 2.6.101 = TREXIO C 2.6.1 + revision 01)" >&2
   exit 1
 fi
 V="${MAJOR}.${MINOR}.$(( PATCH / 100 ))"
 DIR="_fetch/trexio-$V"
 
-# --- fetch (idempotent, cached under _fetch/) ----------------------------------
+# --- fetch (idempotent, cached under _fetch/) ------------------------------------
 if [ ! -d "$DIR" ]; then
   mkdir -p _fetch
   URL_PRIMARY="https://github.com/TREX-CoE/trexio/releases/download/v$V/trexio-$V.tar.gz"
@@ -67,9 +46,7 @@ else
   echo "using cached TREXIO $V release: $DIR" >&2
 fi
 
-# --- assert the tarball's version matches the derived tag ----------------------
-# The release tarball ships configure.ac with AC_INIT([trexio],[X.Y.Z],...);
-# require that X.Y.Z equals the tag derived from dune-project.
+# --- assert the tarball version equals the derived tag ----------------------------
 TARBALL_V=$(sed -n 's/^AC_INIT(\[trexio\],\[\([0-9.][0-9.]*\)\].*/\1/p' \
   "$DIR/configure.ac" 2>/dev/null | head -1)
 if [ "${TARBALL_V:-}" != "$V" ]; then
@@ -79,19 +56,18 @@ if [ "${TARBALL_V:-}" != "$V" ]; then
   exit 1
 fi
 
-# --- refresh the committed trex.json (generator input) ---------------------------
+# --- refresh the committed trex.json (generator input) ------------------------------
 [ -f "$DIR/trex.json" ] || {
   echo "update.sh: no trex.json in $DIR" >&2; exit 1; }
 cp "$DIR/trex.json" ./trex.json
 echo "refreshed trex.json from $DIR" >&2
 
-# --- regenerate the OCaml binding (the generator validates versions itself) ------
-python3 read_json.py >&2
+# --- regenerate the OCaml binding (the generator validates versions itself) --------
+python3 read_json.py
 echo "regenerated lib/trexio.ml, lib/trexio.mli, lib/trexio_stubs.c" >&2
 
-# --- build + run the test suite ---------------------------------------------------
-# Prefer a local bootstrap prefix (make bootstrap / setup.sh install-c-library),
-# falling back to whatever the ambient environment already provides.
+# --- build + run the test suite ------------------------------------------------------
+# A local bootstrap prefix (make bootstrap) wins over the ambient environment.
 if [ -f _prefix/lib/pkgconfig/trexio.pc ]; then
   export PKG_CONFIG_PATH="$PWD/_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
   export LD_LIBRARY_PATH="$PWD/_prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -99,17 +75,15 @@ fi
 if ! dune build @runtest; then
   cat >&2 <<'EOF'
 update.sh: `dune build @runtest` failed.
-If the TREXIO C library is not resolvable via pkg-config, bootstrap it and/or
-point the environment at it:
+If the TREXIO C library is not resolvable via pkg-config:
   ./setup.sh install-c-library <prefix>
-  export PKG_CONFIG_PATH="<prefix>/lib/pkgconfig"
-  export LD_LIBRARY_PATH="<prefix>/lib"
+  export PKG_CONFIG_PATH="<prefix>/lib/pkgconfig"   # and LD_LIBRARY_PATH=<prefix>/lib
 EOF
   exit 1
 fi
 echo "dune build @runtest: OK" >&2
 
-# --- summary: review, and commit if the C API changed -----------------------------
+# --- summary: review, and commit if the C API changed -------------------------------
 echo
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "=== git status of generated files (review; commit if non-empty) ===" >&2
@@ -117,9 +91,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git diff --stat -- lib trex.json
   git diff --cached --stat -- lib trex.json
   echo "Review: if the TREXIO C API changed, commit the files above together" >&2
-  echo "with the version bump (dune-project + trexio.opam)" >&2
-  echo "as one change. Before committing, verify the user-facing path with:" >&2
-  echo "  opam install . --with-test    # C library resolvable via pkg-config" >&2
+  echo "with the version bump (dune-project + trexio.opam) as one change." >&2
 else
   echo "not a git work tree; please diff lib/ + trex.json against the previous" >&2
   echo "release and commit the changes manually." >&2

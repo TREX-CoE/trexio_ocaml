@@ -24,7 +24,7 @@
 (package
  (name trexio)
  (synopsis "Binding for the TREXIO Input/Output library")
- (description "TREXIO is a file format and library for storing wave functions and integrals for quantum chemistry.")
+ (description "TREXIO is a file format and library for wave functions and quantum-chemistry integrals.")
  (depends
   dune
   (dune-configurator :build)

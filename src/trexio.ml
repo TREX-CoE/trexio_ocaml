@@ -21,7 +21,6 @@ external info : unit -> unit = "caml_info"
 
 external to_orbital_list : Int64.t array -> int list = "caml_to_orbital_list"
 
-
 (**** ****)
 
 external read_determinant_list : trexio_file -> offset:int -> buffer_size:int -> (bytes * bytes) array = "caml_read_determinant_list"
@@ -30,8 +29,6 @@ external write_determinant_list : trexio_file -> offset:int -> (bytes * bytes) a
 external read_determinant_coefficient : trexio_file -> offset:int -> buffer_size:int -> float array = "caml_read_determinant_coefficient"
 external write_determinant_coefficient : trexio_file -> offset:int -> float array -> unit = "caml_write_determinant_coefficient"
 
-
 let to_orbital_list_up_dn (up,dn) =
   (to_orbital_list up, to_orbital_list dn)
-
 

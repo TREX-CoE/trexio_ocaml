@@ -4,7 +4,7 @@ name: "trexio"
 version: "2.6.101"
 synopsis: "Binding for the TREXIO Input/Output library"
 description:
-  "TREXIO is a file format and library for storing wave functions and integrals for quantum chemistry."
+  "TREXIO is a file format and library for wave functions and quantum-chemistry integrals."
 maintainer: ["Anthony Scemama <scemama@irsamc.ups-tlse.fr>"]
 authors: [
   "Anthony Scemama <scemama@irsamc.ups-tlse.fr>"
@@ -23,15 +23,7 @@ depends: [
 ]
 build: [
   ["sh" "-c" "pkg-config --atleast-version=2.6.1 trexio || ./setup.sh install-c-library \"$(pwd)/_c-prefix\""]
-  [
-    "dune"
-    "build"
-    "-j"
-    jobs
-    "@install"
-    "@runtest" {with-test}
-    "@doc" {with-doc}
-  ]
+  ["dune" "build" "-j" jobs "@install" "@runtest" {with-test} "@doc" {with-doc}]
 ]
 install: [
   ["sh" "-c" "pkg-config --atleast-version=2.6.1 trexio || ./setup.sh install-c-library \"%{prefix}%\""]

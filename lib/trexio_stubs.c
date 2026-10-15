@@ -14,7 +14,6 @@ static trexio_t* File_val( value file )
   return *((trexio_t**) Data_abstract_val(file));
 }
 
-
 CAMLprim value caml_open_file(value filename, value mode, value backend)
 {
   CAMLparam3(filename, mode, backend);
@@ -36,7 +35,6 @@ CAMLprim value caml_open_file(value filename, value mode, value backend)
   }
 }
 
-
 CAMLprim value caml_close_file(value file)
 {
   CAMLparam1(file);
@@ -48,14 +46,12 @@ CAMLprim value caml_close_file(value file)
   }
 }
 
-
 CAMLprim value caml_inquire_file(value filename)
 {
   CAMLparam1 (filename);
   trexio_exit_code rc = trexio_inquire( String_val (filename) );
   CAMLreturn(Val_bool(rc == TREXIO_SUCCESS));
 }
-
 
 CAMLprim value caml_set_one_based(value file)
 {
@@ -68,7 +64,6 @@ CAMLprim value caml_set_one_based(value file)
   }
 }
 
-
 CAMLprim value caml_set_state(value file, value state)
 {
   CAMLparam2(file, state);
@@ -79,7 +74,6 @@ CAMLprim value caml_set_state(value file, value state)
     caml_failwith(trexio_string_of_error(rc));
   }
 }
-
 
 CAMLprim value caml_get_state(value file)
 {
@@ -93,7 +87,6 @@ CAMLprim value caml_get_state(value file)
   }
 }
 
-
 CAMLprim value caml_info(value unit)
 {
   CAMLparam1(unit);
@@ -104,7 +97,6 @@ CAMLprim value caml_info(value unit)
     caml_failwith(trexio_string_of_error(rc));
   }
 }
-
 
 CAMLprim value caml_to_orbital_list(value bitfield)
 {
@@ -131,15 +123,14 @@ CAMLprim value caml_to_orbital_list(value bitfield)
   result = Val_emptylist;
   for (int i=occupied_num-1 ; i >= 0 ; --i) {
     cons = caml_alloc(2, 0);
-    Store_field(cons, 0, Val_int(list[i])); // head
-    Store_field(cons, 1, result); // head
+    Store_field(cons, 0, Val_int(list[i]));
+    Store_field(cons, 1, result);
     result = cons;
   }
 
   free(list);
   CAMLreturn(result);
 }
-
 
 
 CAMLprim value caml_delete_metadata(value file)
@@ -10374,7 +10365,6 @@ CAMLprim value caml_read_determinant_coefficient(value file_in, value offset_in,
   CAMLreturn(result);
 }
 
-
 CAMLprim value caml_write_determinant_coefficient(value file_in, value offset_in, value array)
 {
   CAMLparam3 ( file_in, offset_in, array );
@@ -10398,5 +10388,4 @@ CAMLprim value caml_write_determinant_coefficient(value file_in, value offset_in
   free(buffer);
   CAMLreturn( Val_unit );
 }
-
 

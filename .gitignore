@@ -1,41 +1,16 @@
-*.annot
-*.cmo
-*.cma
-*.cmi
-*.a
-*.o
-*.cmx
-*.cmxs
-*.cmxa
-
-# ocamlbuild working directory
+# build artifacts
+*.annot *.cmo *.cma *.cmi *.cmx *.cmxs *.cmxa
+*.a *.o *.byte *.native
 _build/
-
-# ocamlbuild targets
-*.byte
-*.native
-
-# oasis generated files
-setup.data
-setup.log
-
-# Merlin configuring file for Vim and Emacs
-.merlin
-
-# Dune generated files
 *.install
-
-# Local OPAM switch
+setup.data setup.log
+.merlin
 _opam/
-
-# python bytecode cache
 __pycache__/
-# fetched TREXIO release tarball + extraction (update.sh / setup.sh)
+# fetched TREXIO release + local bootstrap prefixes
 _fetch/
-# bootstrapped C-library prefix (setup.sh install-c-library; dev `make bootstrap`)
 _prefix/
-# C-library prefix the opam record's build: step installs into the package root
 _c-prefix/
-# test artifacts (dune @runtest writes tmp_<pid>/ under the CWD)
+# dune @runtest tmp files
 tmp/
 tmp_*/

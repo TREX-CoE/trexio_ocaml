@@ -5,16 +5,26 @@ import os
 import re
 import sys
 
-# repo root (placed here by setup.sh); optional override for manual runs:
-#   python3 read_json.py /path/to/trex.json
-json_file = "trex.json"
-stubs_file= "trexio_stubs.c"
-ml_file   = "trexio.ml"
-mli_file  = ml_file+"i"
+# input json: argv[1], else the committed trex.json.
+json_file  = "trex.json"
+stubs_file = "trexio_stubs.c"
+ml_file    = "trexio.ml"
+mli_file   = ml_file + "i"
 
 def fail(msg):
     print(msg, file=sys.stderr)
     sys.exit(1)
+
+def split_template(name, marker):
+    """(pre, post) = src/<name> text split at its code-gen marker."""
+    lines = open("src/"+name).readlines()
+    i = next((i for i, l in enumerate(lines) if l.startswith(marker)), None)
+    if i is None: fail("no %r marker in src/%s" % (marker, name))
+    return "".join(lines[:i]), "".join(lines[i:])
+
+def emit(f, t, group, element, type_):
+    f.write("".join(s.replace("{group}", group).replace("{element}", element)
+                    .replace("{type}", type_) for s in t))
 
 def check_version():
     # dune-project is the single source of truth for the binding version.
@@ -26,20 +36,11 @@ def check_version():
        else:
           fail("dune-project: no (version ...) line found")
 
-    # Versioning convention (Rust-binding convention, cf. trexio-rs):
-    #   MAJOR.MINOR.PATCHR[R]  ==  TREXIO C library MAJOR.MINOR.(PATCH/100)
-    #                               + 2-digit binding revision RR
-    # e.g. 2.6.101 = TREXIO C 2.6.1 + binding revision 01; the patch
-    # component must therefore have at least 3 digits.
+    # 2.6.1NN = TREXIO C library 2.6.1 (patch/100) + 2-digit binding revision NN
     m = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", dune_version)
     if m is None or len(m.group(3)) < 3:
-       fail(
-          "dune-project version '%s' does not follow the binding\n"
-          "versioning convention (Rust-binding style): the patch component\n"
-          "must encode the TREXIO C-library patch plus a 2-digit binding\n"
-          "revision, e.g. 2.6.1NN = TREXIO C 2.6.1 + binding revision NN\n"
-          "(2.6.101). A bare C-library version such as 2.6.1 is not a valid\n"
-          "binding version.\n" % dune_version)
+       fail("dune-project version '%s' must be A.B.CNN (C patch + 2-digit "
+            "binding revision, e.g. 2.6.101)" % dune_version)
 
     # The opam record must carry the same version.
     if not os.path.exists("trexio.opam"):
@@ -58,15 +59,7 @@ def check_version():
 
 def write_stubs(data):
 
-    with open("src/"+stubs_file,'r') as f:
-        content = f.readlines()
-        index = -1
-        for i, line in enumerate(content):
-          if line.startswith("/**** ****/"):
-             index = i
-             break
-        content_pre  = ''.join(content[:index])
-        content_post = ''.join(content[index:])
+    content_pre, content_post = split_template(stubs_file, "/**** ****/")
 
     with open("lib/"+stubs_file,'w') as f:
         f.write(content_pre)
@@ -496,15 +489,7 @@ CAMLprim value caml_write_{group}_{element}(value file_in, value offset_in, valu
 
 def write_mli(data):
 
-    with open("src/"+mli_file,'r') as f:
-        content = f.readlines()
-        index = -1
-        for i, line in enumerate(content):
-          if line.startswith("(**** ****)"):
-             index = i
-             break
-        content_pre  = ''.join(content[:index])
-        content_post = ''.join(content[index:])
+    content_pre, content_post = split_template(mli_file, "(**** ****)")
 
     with open("lib/"+mli_file,'w') as f:
         f.write(content_pre)
@@ -525,25 +510,16 @@ def write_mli(data):
                     if data[group][element][0] in [ "int", "float", "dim", "index" ]:
                         t = [ "val read_{group}_{element} : trexio_file -> {type}\n" ,
                               "val write_{group}_{element}: trexio_file -> {type} -> unit\n" ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0]) )
+                        emit(f, t, group, element, data[group][element][0])
 
                     elif data[group][element][0] in [ "string" ]:
                         t = [ "val read_{group}_{element} : ?max_str_len:int -> trexio_file -> {type}\n" ,
                               "val write_{group}_{element}: trexio_file -> {type} -> unit\n" ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0]) )
+                        emit(f, t, group, element, data[group][element][0])
 
                     elif data[group][element][0] in [ "dim readonly" ]:
                         t = [ "val read_{group}_{element} : trexio_file -> {type}\n" ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0].split()[0]) )
+                        emit(f, t, group, element, data[group][element][0].split()[0])
 
                 # Arrays
                 else:
@@ -554,10 +530,7 @@ def write_mli(data):
                               "val read_{group}_{element} : trexio_file -> {type} array\n" ,
                               "val write_{group}_{element}: trexio_file -> {type} array -> unit\n"
 ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0]) )
+                        emit(f, t, group, element, data[group][element][0])
 
                     elif data[group][element][0] in [ "string" ]:
                         t = [ "val read_safe_{group}_{element} : trexio_file -> int -> int -> {type} array\n" ,
@@ -565,10 +538,7 @@ def write_mli(data):
                               "val read_{group}_{element} : ?max_str_len:int -> trexio_file -> {type} array\n" ,
                               "val write_{group}_{element}: trexio_file -> {type} array -> unit\n"
 ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0]) )
+                        emit(f, t, group, element, data[group][element][0])
 
                     elif data[group][element][0] in [ "float sparse" ]:
                         size = len(data[group][element][1])
@@ -576,25 +546,14 @@ def write_mli(data):
                         t = [ "val read_{group}_{element} : trexio_file -> offset:dim -> buffer_size:dim -> {type}\n" ,
                               "val write_{group}_{element} : trexio_file -> offset:dim -> {type} -> unit\n" ,
                             ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", typ) )
+                        emit(f, t, group, element, typ)
 
         f.write(content_post)
 
 
 def write_ml(data):
 
-    with open("src/"+ml_file,'r') as f:
-        content = f.readlines()
-        index = -1
-        for i, line in enumerate(content):
-          if line.startswith("(**** ****)"):
-             index = i
-             break
-        content_pre  = ''.join(content[:index])
-        content_post = ''.join(content[index:])
+    content_pre, content_post = split_template(ml_file, "(**** ****)")
 
     with open("lib/"+ml_file,'w') as f:
         f.write(content_pre)
@@ -615,26 +574,17 @@ def write_ml(data):
                     if data[group][element][0] in [ "int", "float", "dim", "index" ]:
                         t = [ "external read_{group}_{element} : trexio_file -> {type} = \"caml_read_{group}_{element}\"\n" ,
                               "external write_{group}_{element}: trexio_file -> {type} -> unit = \"caml_write_{group}_{element}\"\n" ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0]) )
+                        emit(f, t, group, element, data[group][element][0])
 
                     if data[group][element][0] in [ "string" ]:
                         t = [ "external read_{group}_{element}_c : trexio_file -> int -> {type} = \"caml_read_{group}_{element}\"\n" ,
                               "let read_{group}_{element} ?(max_str_len=8192) f = read_{group}_{element}_c f max_str_len\n",
                               "external write_{group}_{element}: trexio_file -> {type} -> unit = \"caml_write_{group}_{element}\"\n" ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0]) )
+                        emit(f, t, group, element, data[group][element][0])
 
                     elif data[group][element][0] in [ "dim readonly" ]:
                         t = [ "external read_{group}_{element} : trexio_file -> {type} = \"caml_read_{group}_{element}\"\n" ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0].split()[0]) )
+                        emit(f, t, group, element, data[group][element][0].split()[0])
 
                 # Arrays
                 else:
@@ -656,10 +606,7 @@ def write_ml(data):
                         t += [ "let write_{group}_{element} f a = \n  let size = 1 in \n"]
                         t += t_prime
                         t += [ "  write_safe_{group}_{element} f size a\n\n" ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0]) )
+                        emit(f, t, group, element, data[group][element][0])
 
                     elif data[group][element][0] in [ "string" ]:
                         t = [ "external read_safe_{group}_{element} : trexio_file -> int -> int -> {type} array = \"caml_read_safe_{group}_{element}\"\n" ,
@@ -681,10 +628,7 @@ def write_ml(data):
                                "      |> (+) 1 in\n" ]
                         t += t_prime
                         t += [ "  write_safe_{group}_{element} f size max_str_len a\n\n" ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", data[group][element][0]) )
+                        emit(f, t, group, element, data[group][element][0])
 
 
                     elif data[group][element][0] in [ "float sparse" ]:
@@ -693,10 +637,7 @@ def write_ml(data):
                         t = [ "external read_{group}_{element} : trexio_file -> offset:dim -> buffer_size:dim -> {type} = \"caml_read_{group}_{element}\"\n" ,
                               "external write_{group}_{element} : trexio_file -> offset:dim -> {type} -> unit = \"caml_write_{group}_{element}\"\n"
                             ]
-                        for i in t:
-                            f.write( i.replace("{group}", group)
-                                      .replace("{element}", element)
-                                      .replace("{type}", typ) )
+                        emit(f, t, group, element, typ)
 
         f.write(content_post)
 
@@ -714,7 +655,6 @@ def main():
         data = json.load(f)
         for group in data:
           for element in data[group]:
-             print(f"{group}_{element}")
              if data[group][element][0] == "str":
                   data[group][element][0] = "string"
 

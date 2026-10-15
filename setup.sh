@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 # setup.sh — TREXIO C-library bootstrap (make bootstrap / the opam record).
-#
 #   ./setup.sh build-c-library [prefix]     # fetch + configure + make (no install)
-#   ./setup.sh install-c-library <prefix>   # build-c-library + make install + .pc fixup
-#
-# Offline-first from the vendored external/trexio-<V>.tar.gz (.sha256-checked),
-# static-only, HDF5 optional (TEXT-only C library without its headers). The
-# release tarball ships its own configure + libtool, so no autotools packages
-# are needed. V is derived from the dune-project version: A.B.1NN -> A.B.(P/100).
+#   ./setup.sh install-c-library <prefix>   # build + install + .pc fixup
+# Offline-first from the vendored external/trexio-<V>.tar.gz (.sha256),
+# static-only, HDF5 optional. V is derived from dune-project: A.B.1NN -> A.B.(P/100).
 
 set -euo pipefail
 
@@ -16,7 +12,7 @@ cd "$(dirname "$0")"
 usage() {
   cat >&2 <<EOF
 usage: $(basename "$0") build-c-library [prefix]
-       $(basename "$0") install-c-library <prefix>
+        $(basename "$0") install-c-library <prefix>
 EOF
   exit 1
 }
@@ -36,8 +32,8 @@ V="${MAJOR}.${MINOR}.$(( PATCH / 100 ))"
 DIR="_fetch/trexio-$V"
 
 # --- fetch (idempotent, cached under _fetch/) ------------------------------------
-# Offline-first: vendored tarball first; network fallback is the release asset
-# only (the tag/source archive has no generated configure and cannot be built).
+# Vendored tarball first; the network fallback is the release asset only
+# (the tag source archive has no generated configure and cannot be built).
 fetch() {
   [ -d "$DIR" ] && return
   mkdir -p _fetch
@@ -55,20 +51,17 @@ fetch() {
   fi
 }
 
-# --- build: the trexio record's build: stanza (opam 2.x makes the prefix
-#     read-only during build:, so everything stays inside the build directory).
-#     The autotools build is required (not the tarball's CMake): only it
-#     installs trexio.pc (Makefile.am: pkgconfig_DATA = pkgconfig/trexio.pc).
+# The record's build: stanza: opam 2.x makes the prefix read-only there, so
+# everything stays inside the build dir. The autotools build is required
+# (not the tarball's CMake): only it installs trexio.pc.
 build_c_library() {
   local prefix="${1:-/usr/local}"
   fetch
   cd "$DIR"
-  # The v2.6.1 configure probes the Fortran compiler unconditionally
-  # (AC_FC_FREEFORM) and hard-fails when no free-form flag works:
-  # "Fortran does not accept free-form source" (newer gfortran, e.g. the
-  # opam-ci images). Fortran is never built (--without-fortran), so
-  # neutralize the fatal. With a future configure without this fatal the
-  # substitution matches nothing and is a no-op.
+  # The released v2.6.1 configure probes Fortran unconditionally and dies
+  # with "Fortran does not accept free-form source" on newer gfortran even
+  # though no Fortran is built (--without-fortran); neutralise the fatal
+  # (no-op on a configure without the line).
   sed -i.bak \
     -e 's|^  as_fn_error 77 "Fortran does not accept free-form source" .*|  : # fortran free-form probe failed; harmless (Fortran is not built: --without-fortran)|' \
     configure && rm -f configure.bak
@@ -76,11 +69,8 @@ build_c_library() {
   make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
 }
 
-# Re-running ./configure only when the Makefile's recorded --prefix differs:
-# the installed trexio.pc has its libdir substituted at configure time
-# (config.status), so a stale Makefile (different prefix) must re-configure.
-# In the opam flow the install: stanza finds the Makefile that build:
-# configured for the same prefix, and make afterwards does nothing.
+# Re-run ./configure only if the Makefile's recorded --prefix differs: the
+# installed trexio.pc has its libdir substituted at configure time.
 configure_if_needed() {
   local prefix="$1" cur=""
   [ -f Makefile ] && cur="$(sed -n 's/^prefix *= *//p' Makefile | head -1)"
@@ -89,15 +79,14 @@ configure_if_needed() {
     || ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=no
 }
 
-# --- install: one-shot bootstrap (make bootstrap, CI, or the trexio record's
-#     install: stanza, which runs with a writable prefix). -----------------
+# One-shot bootstrap (make bootstrap, CI, the record's install: stanza).
 install_c_library() {
   local prefix="${1:-}"
   [ -n "$prefix" ] || { echo "usage: ./setup.sh install-c-library <prefix>" >&2; exit 1; }
   build_c_library "$prefix"
   make install prefix="$prefix"
-  # Plain `pkg-config --libs` must be enough to link the static archive:
-  # merge the static (private) deps into the installed .pc Libs line.
+  # Plain `pkg-config --libs` must link the static archive: merge the
+  # static (private) deps into the installed .pc Libs line.
   local pc="$prefix/lib/pkgconfig/trexio.pc"
   if [ -f "$pc" ]; then
     local libs
