@@ -1,31 +1,17 @@
 #!/usr/bin/env bash
-# update.sh — the single owner of binding code generation.
+# update.sh — the ONLY place that fetches or generates binding code:
+# derive the TREXIO C tag from dune-project (A.B.1NN -> A.B.(P/100)), fetch
+# the release tarball (cached under _fetch/), assert the tarball's version,
+# refresh trex.json, regenerate lib/ from the src/ templates, then run
+# `dune build @runtest` — so a broken regeneration fails here, not later.
+# It ends with a git status/diff summary of lib/ + trex.json for review.
 #
-# Flow:
-#   1. derive the TREXIO C tag from the dune-project binding version
-#      (2.6.1NN  ==  TREXIO C MAJOR.MINOR.(PATCH/100),  e.g. 2.6.101 -> 2.6.1)
-#   2. fetch the pinned release tarball (cached under _fetch/), and refresh
-#      the committed trex.json in the repo root from the tarball, asserting
-#      the tarball's own version matches the derived tag
-#   3. python3 read_json.py  — regenerate lib/trexio.ml, lib/trexio.mli,
-#      lib/trexio_stubs.c from the src/ templates
-#      (the generator re-validates dune-project vs opam versions)
-#   4. dune build @runtest   — compile the freshly generated files and run
-#      the whole test suite, so a broken regeneration fails here, not later
-#   5. print a git status/diff summary of lib/ + trex.json, so you can review
-#      and commit the changes together if the TREXIO C API actually changed
-#
-# Requirements: bash, curl, tar, python3, and network access to github.com
-# (only for step 2, and only when _fetch/trexio-<tag> is not cached).
-# Step 4 additionally needs the TREXIO C library resolvable via pkg-config:
-# a local bootstrap prefix (./setup.sh install-c-library <prefix>, default
-# _prefix in this repo) is picked up automatically when present; otherwise
-# PKG_CONFIG_PATH/LD_LIBRARY_PATH must point at an installed TREXIO.
-#
-# This is the ONLY script in the repo that fetches or generates anything.
-# The generated files (lib/trexio.ml, lib/trexio.mli, lib/trexio_stubs.c)
-# and the generator input (trex.json) are committed, so `opam install .`
-# needs neither a network connection nor python3 at build time.
+# Requirements: bash, sed, cut, curl, tar, python3 (network only when
+# _fetch/trexio-<tag> is not cached); the final `dune build @runtest` also
+# needs a TREXIO C library resolvable via pkg-config (`make bootstrap`
+# provides ./_prefix, which is picked up automatically below). Since the
+# generated files are committed, `opam install .` needs neither network
+# access nor python3.
 
 set -euo pipefail
 

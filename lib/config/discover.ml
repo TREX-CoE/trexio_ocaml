@@ -1,44 +1,39 @@
 module C = Configurator.V1
 
-(** pkg-config prints space-separated words (e.g. `-L/x -ltrexio -lm`).
-    Drop the newlines of the RAW stdout first: a trailing whitespace
-    sequence would otherwise be extracted as a spurious token (e.g. "\n")
-    and end up in gcc's command line. (Configurator's own pkg-config query
-    sanitises internally; the raw Process.run path does not.) *)
+(** Words of raw pkg-config output; newlines become spaces, otherwise a
+    trailing newline would be extracted as a spurious flag token. *)
 let words s =
-  let s = String.concat "" (String.split_on_char '\n' s) in
-  C.Flags.extract_blank_separated_words s
+  C.Flags.extract_blank_separated_words
+    (String.map (fun c -> if c = '\n' then ' ' else c) s)
 
-(** Fallback discovery for a TREXIO C library that conf-trexio installed
-    into the current opam switch (its install: step runs `setup.sh
-    install-c-library <switch-prefix>`). Only consulted when pkg-config
-    finds nothing on the default search paths (system/conda installs, or a
-    PKG_CONFIG_PATH pointing at a ./setup.sh prefix). The switch prefix is
-    taken from $OPAM_SWITCH_PREFIX; when that variable is not exported, it
-    is derived from the toolchain on PATH (`ocamlc -where` =
-    <prefix>/lib/ocaml). *)
+(** <switch>/lib/pkgconfig/trexio.pc *)
 let pc_of prefix =
   Filename.concat (Filename.concat (Filename.concat prefix "lib") "pkgconfig") "trexio.pc"
 
+(** The switch that conf-trexio installed the C library into:
+    $OPAM_SWITCH_PREFIX if it holds a bootstrapped .pc, else derived from
+    the toolchain (`ocamlc -where` = <prefix>/lib/ocaml) when the variable
+    is not exported. Not_found if no bootstrapped library exists. *)
 let switch_prefix c =
   let explicit = try [ Unix.getenv "OPAM_SWITCH_PREFIX" ] with Not_found -> [] in
   let derived =
-    let r = C.Process.run c "ocamlc" [ "-where" ] in
-    if r.exit_code <> 0 then []
-    else
-      match String.split_on_char '\n' r.stdout with
-      | [] -> []
-      | ocaml_lib :: _ -> [ Filename.dirname (Filename.dirname ocaml_lib) ]
+    match C.Process.run c "ocamlc" [ "-where" ] with
+    | r when r.exit_code <> 0 -> []
+    | r ->
+        match String.split_on_char '\n' r.stdout with
+        | [] -> []
+        | lib :: _ -> [ Filename.dirname (Filename.dirname lib) ]
   in
   match List.find_opt (fun p -> Sys.file_exists (pc_of p)) (explicit @ derived) with
   | Some prefix -> prefix
   | None -> raise Not_found
 
+(** Fallback for the C library that conf-trexio installed into the switch —
+    used only when pkg-config finds nothing on the usual paths. *)
 let switch_conf c =
   let prefix = switch_prefix c in
   let pc = pc_of prefix in
-  let pcdir = Filename.dirname pc in
-  let env = [ "PKG_CONFIG_PATH=" ^ pcdir ] in
+  let env = [ "PKG_CONFIG_PATH=" ^ Filename.dirname pc ] in
   let cflags = C.Process.run c ~env "pkg-config" [ "--cflags"; "trexio" ] in
   let libs = C.Process.run c ~env "pkg-config" [ "--libs"; "trexio" ] in
   if cflags.exit_code <> 0 || libs.exit_code <> 0 then
@@ -62,7 +57,7 @@ let () =
       | None ->
           (try switch_conf c
            with Not_found ->
-             C.die "TREXIO C library not found.\n  Install it (./setup.sh install-c-library <prefix>) and set PKG_CONFIG_PATH=<prefix>/lib/pkgconfig, or run 'opam install trexio' so conf-trexio bootstraps it into the opam switch.")
+             C.die "TREXIO C library not found.\n  Install one, or run 'opam install trexio' so conf-trexio bootstraps it into the opam switch.")
     in
     C.Flags.write_sexp "c_flags.sexp" conf.cflags;
     C.Flags.write_sexp "c_library_flags.sexp" conf.libs);;

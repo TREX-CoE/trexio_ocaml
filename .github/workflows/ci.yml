@@ -15,66 +15,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------------------
-      # 1. Autotools toolchain + HDF5 for the C library.
-      #    The release tarball builds via ./configure (autotools), so
-      #    the CMake and python3 the plan listed are not needed.
-      # ---------------------------------------------------------------
-      - name: Install autotools and HDF5
+      # The vendored release tarball ships its own configure + libtool, so
+      # build-essential + pkg-config is enough (no autotools packages).
+      - name: Install build tools and HDF5
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential automake autoconf libtool pkg-config \
-            libhdf5-dev
+            build-essential pkg-config libhdf5-dev
 
-      # ---------------------------------------------------------------
-      # 2. Get the TREXIO C library from the pinned release (autotools)
-      #    ./setup.sh derives the tag from dune-project, fetches the
-      #    release tarball under _fetch/, and runs
-      #    ./configure --prefix=... --with-hdf5=yes --without-fortran,
-      #    make -j, make install.
-      # ---------------------------------------------------------------
-      - name: Compute TREXIO C library tag from dune-project (Rust-binding convention; echo for the log)
-        run: |
-          PV=$(sed -n 's/.*version \([0-9.][0-9.]*\).*/\1/p' dune-project | head -1)
-          MAJOR=$(echo "$PV" | cut -d. -f1)
-          MINOR=$(echo "$PV" | cut -d. -f2)
-          PATCH=$(echo "$PV" | cut -d. -f3)
-          # Binding 2.6.1NN targets C library 2.6.1 (same rule as trexio-rs CI)
-          echo "Binding $PV -> C library ${MAJOR}.${MINOR}.$(( PATCH / 100 ))"
-
-      - name: Build and install the TREXIO C library (autotools, from the pinned release)
+      # Build the TREXIO C library from the pinned (vendored) release into
+      # /usr/local — this leg exercises the "system C library preferred"
+      # path of the in-tree build.
+      - name: Build and install the TREXIO C library
         run: |
           sudo ./setup.sh install-c-library /usr/local
           sudo ldconfig
           pkg-config --modversion trexio
 
-      # ---------------------------------------------------------------
-      # 3. OCaml: a fresh switch (OCaml 5.x from the official opam
-      #    repository), then: install the dependencies (this runs the
-      #    conf-trexio pkg-config check), and build + install + test
-      #    the binding with dune, in-tree.
-      #
-      # Note: we follow the setup-ocaml README flow
-      # ("opam install . --deps-only" then dune) instead of a full
-      # "opam install . --with-test": the action nests its opam root
-      # inside the workspace (<workspace>/_opam), and under opam 2.6.1
-      # a full in-tree pin build then breaks dune's workspace
-      # resolution ("Don't know about directory ..."). Reproduced
-      # locally; the deps-only flow avoids the in-tree build step.
-      # ---------------------------------------------------------------
+      # OCaml in a fresh switch. The deps are installed via
+      # `opam install . --deps-only` (runs the conf-trexio C-library check)
+      # and the binding is then built + tested in-tree: a full in-tree
+      # `opam install .` does not work, because setup-ocaml nests its opam
+      # root inside the workspace and that breaks dune (opam 2.6.1).
       - name: Set up OCaml
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: 5
 
-      # Runs the conf-trexio build step (pkg-config check for the C
-      # library); installs dune, dune-configurator, conf-pkg-config.
+      # Runs the conf-trexio build step (pkg-config check); installs dune,
+      # dune-configurator, conf-pkg-config.
       - name: Install dependency packages
         run: opam install . --deps-only --with-test -y
 
-      # Build, install into the switch, and run the test suite
-      # (tests/trexio_tests.ml) with dune, in the working tree.
+      # Build, install into the switch, and run the test suite (in-tree).
       - name: Build, install and test the binding with dune
         run: |
           opam exec -- dune build @install
@@ -90,15 +63,11 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------
-  # Bootstrap leg: the machine has NO TREXIO C library.
-  # The conf-trexio build step
-  #   (pkg-config --exists trexio || ./setup.sh build-c-library %prefix%)
-  # must then compile it from the vendored external/trexio-<V>.tar.gz
-  # (statically; its install: step places it into the opam switch), and the
-  # binding must build
-  # + test against it. The vendored release tarball is self-contained
-  # (pre-generated configure + libtool), so no autotools packages are
-  # needed on this leg.
+  # Bootstrap leg: the machine has NO TREXIO C library. conf-trexio must
+  # then compile the vendored external/trexio-<V>.tar.gz statically
+  # (build: stanza; the tarball is self-contained) and install it into
+  # the switch (install: stanza); the binding must build + test against
+  # it, found via the discover.ml switch fallback.
   # ---------------------------------------------------------------
   build-and-test-bootstrap:
     name: Build & Test (no system C lib - bootstrap, ubuntu-latest)
@@ -126,29 +95,17 @@ jobs:
         with:
           ocaml-compiler: 5
 
-      # Install conf-trexio (pinned by setup-ocaml from this repository as
-      # `conf-trexio.dev`) + its deps: its build step runs
-      #   pkg-config --exists trexio || ./setup.sh build-c-library %prefix%
-      # and, finding nothing, compiles the vendored tarball (statically);
-      # its install step then places the library into the switch.
-      # NOTE 1: `opam install . --deps-only` would NOT work here — both .opam
-      # records of this repo are "project" packages as far as opam is
-      # concerned, so --deps-only skips conf-trexio and the bootstrap never
-      # runs (and the in-tree dune step below then fails).
-      # NOTE 2: the record must be named `conf-trexio.dev` — unqualified,
-      # opam can resolve the name to the (unrelated) opam-repository package
-      # `conf-trexio` instead of this repo's pinned record.
-      # NOTE 3: dune + dune-configurator are listed explicitly: they are the
-      # {build} deps of the trexio record and used to be pulled in by the old
-      # `opam install . --deps-only`; a conf-trexio-only install brings no
-      # OCaml toolchain, and the in-tree build below needs them.
+      # Install the pinned conf-trexio BY NAME (setup-ocaml pins it as
+      # `conf-trexio.dev`): `opam install . --deps-only` would skip it —
+      # every .opam record in the worktree is a "project" package and
+      # --deps-only never builds project packages, so the bootstrap would
+      # not run. dune + dune-configurator are listed explicitly: a conf
+      # package brings no OCaml toolchain, and the in-tree build needs it.
       - name: Install conf-trexio (bootstraps the C library into the switch)
         run: opam install conf-trexio.dev dune dune-configurator --with-test -y
 
-      # discover.ml finds the library via pkg-config (system/conda) or falls
-      # back to <switch>/lib/pkgconfig/trexio.pc, where <switch> is
-      # $OPAM_SWITCH_PREFIX, or derived from `ocamlc -where` when that
-      # variable is not exported into the dune environment.
+      # discover.ml resolves the C library via pkg-config, falling back to
+      # <switch>/lib/pkgconfig/trexio.pc.
       - name: Build, install and test the binding with dune
         run: |
           opam exec -- dune build @install
