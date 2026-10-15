@@ -126,15 +126,25 @@ jobs:
         with:
           ocaml-compiler: 5
 
-      # Builds conf-trexio from the local pin. Its build step runs:
+      # Install conf-trexio (pinned by setup-ocaml from this repository as
+      # `conf-trexio.dev`) + its deps: its build step runs
       #   pkg-config --exists trexio || ./setup.sh build-c-library %prefix%
       # and, finding nothing, compiles the vendored tarball (statically);
-      # the install step then places it into the switch.
-      - name: Install dependency packages (conf-trexio bootstraps the C library)
-        run: opam install . --deps-only --with-test -y
+      # its install step then places the library into the switch.
+      # NOTE 1: `opam install . --deps-only` would NOT work here — both .opam
+      # records of this repo are "project" packages as far as opam is
+      # concerned, so --deps-only skips conf-trexio and the bootstrap never
+      # runs (and the in-tree dune step below then fails).
+      # NOTE 2: the record must be named `conf-trexio.dev` — unqualified,
+      # opam can resolve the name to the (unrelated) opam-repository package
+      # `conf-trexio` instead of this repo's pinned record.
+      - name: Install conf-trexio (bootstraps the C library into the switch)
+        run: opam install conf-trexio.dev --with-test -y
 
-      # discover.ml falls back to $OPAM_SWITCH_PREFIX/lib/pkgconfig/trexio.pc
-      # (the dune build env has no PKG_CONFIG_PATH pointing at the switch).
+      # discover.ml finds the library via pkg-config (system/conda) or falls
+      # back to <switch>/lib/pkgconfig/trexio.pc, where <switch> is
+      # $OPAM_SWITCH_PREFIX, or derived from `ocamlc -where` when that
+      # variable is not exported into the dune environment.
       - name: Build, install and test the binding with dune
         run: |
           opam exec -- dune build @install
@@ -144,11 +154,12 @@ jobs:
       - name: Verify the bootstrap installed a static C library into the switch
         run: |
           opam exec -- sh -c '
-            ls "$OPAM_PREFIX/lib" | grep -x libtrexio.a
-            test -z "$(ls "$OPAM_PREFIX/lib" | grep "^libtrexio\.so" || true)"
-            test -f "$OPAM_PREFIX/lib/pkgconfig/trexio.pc"
-            grep -q "$OPAM_PREFIX/lib" _build/default/lib/c_library_flags.sexp
-            echo "OK: static bootstrap C library in the switch, used by the in-tree build"
+            P="$(ocamlc -where | sed "s|/lib/ocaml$||")"
+            ls "$P/lib" | grep -x libtrexio.a
+            test -z "$(ls "$P/lib" | grep "^libtrexio\.so" || true)"
+            test -f "$P/lib/pkgconfig/trexio.pc"
+            grep -q "$P/lib" _build/default/lib/c_library_flags.sexp
+            echo "OK: static bootstrap C library in the switch ($P), used by the in-tree build"
           '
 
       - name: Upload build artifacts on failure
