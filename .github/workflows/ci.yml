@@ -138,8 +138,12 @@ jobs:
       # NOTE 2: the record must be named `conf-trexio.dev` — unqualified,
       # opam can resolve the name to the (unrelated) opam-repository package
       # `conf-trexio` instead of this repo's pinned record.
+      # NOTE 3: dune + dune-configurator are listed explicitly: they are the
+      # {build} deps of the trexio record and used to be pulled in by the old
+      # `opam install . --deps-only`; a conf-trexio-only install brings no
+      # OCaml toolchain, and the in-tree build below needs them.
       - name: Install conf-trexio (bootstraps the C library into the switch)
-        run: opam install conf-trexio.dev --with-test -y
+        run: opam install conf-trexio.dev dune dune-configurator --with-test -y
 
       # discover.ml finds the library via pkg-config (system/conda) or falls
       # back to <switch>/lib/pkgconfig/trexio.pc, where <switch> is
