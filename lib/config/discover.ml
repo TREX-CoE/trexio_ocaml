@@ -9,27 +9,45 @@ let words s =
   let s = String.concat "" (String.split_on_char '\n' s) in
   C.Flags.extract_blank_separated_words s
 
-(** Fallback discovery for a TREXIO C library that conf-trexio installed into the
-    current opam switch (its install: step runs `setup.sh install-c-library
-    <switch-prefix>`). Only consulted when pkg-config finds nothing on the default
-    search paths (system/conda installs, or a PKG_CONFIG_PATH pointing at a
-    ./setup.sh prefix). *)
+(** Fallback discovery for a TREXIO C library that conf-trexio installed
+    into the current opam switch (its install: step runs `setup.sh
+    install-c-library <switch-prefix>`). Only consulted when pkg-config
+    finds nothing on the default search paths (system/conda installs, or a
+    PKG_CONFIG_PATH pointing at a ./setup.sh prefix). The switch prefix is
+    taken from $OPAM_SWITCH_PREFIX; when that variable is not exported, it
+    is derived from the toolchain on PATH (`ocamlc -where` =
+    <prefix>/lib/ocaml). *)
+let pc_of prefix =
+  Filename.concat (Filename.concat (Filename.concat prefix "lib") "pkgconfig") "trexio.pc"
+
+let switch_prefix c =
+  let explicit = try [ Unix.getenv "OPAM_SWITCH_PREFIX" ] with Not_found -> [] in
+  let derived =
+    let r = C.Process.run c "ocamlc" [ "-where" ] in
+    if r.exit_code <> 0 then []
+    else
+      match String.split_on_char '\n' r.stdout with
+      | [] -> []
+      | ocaml_lib :: _ -> [ Filename.dirname (Filename.dirname ocaml_lib) ]
+  in
+  match List.find_opt (fun p -> Sys.file_exists (pc_of p)) (explicit @ derived) with
+  | Some prefix -> prefix
+  | None -> raise Not_found
+
 let switch_conf c =
-  let switch = Unix.getenv "OPAM_SWITCH_PREFIX" in (* Not_found if unset *)
-  let pcdir = Filename.concat (Filename.concat switch "lib") "pkgconfig" in
-  if not (Sys.file_exists (Filename.concat pcdir "trexio.pc")) then
-    raise Not_found
-  else
-    let env = [ "PKG_CONFIG_PATH=" ^ pcdir ] in
-    let cflags = C.Process.run c ~env "pkg-config" [ "--cflags"; "trexio" ] in
-    let libs = C.Process.run c ~env "pkg-config" [ "--libs"; "trexio" ] in
-    if cflags.exit_code <> 0 || libs.exit_code <> 0 then
-      C.die "Found %s/trexio.pc (the conf-trexio bootstrap library) but pkg-config failed:\n%s"
-        pcdir
-        (if cflags.exit_code <> 0 then cflags.stderr else libs.stderr);
-    let conf : C.Pkg_config.package_conf =
-      { libs = words libs.stdout; cflags = words cflags.stdout } in
-    conf
+  let prefix = switch_prefix c in
+  let pc = pc_of prefix in
+  let pcdir = Filename.dirname pc in
+  let env = [ "PKG_CONFIG_PATH=" ^ pcdir ] in
+  let cflags = C.Process.run c ~env "pkg-config" [ "--cflags"; "trexio" ] in
+  let libs = C.Process.run c ~env "pkg-config" [ "--libs"; "trexio" ] in
+  if cflags.exit_code <> 0 || libs.exit_code <> 0 then
+    C.die "Found %s (the conf-trexio bootstrap library) but pkg-config failed:\n%s"
+      pc
+      (if cflags.exit_code <> 0 then cflags.stderr else libs.stderr);
+  let conf : C.Pkg_config.package_conf =
+    { libs = words libs.stdout; cflags = words cflags.stdout } in
+  conf
 
 let () =
   C.main ~name:"trexio" (fun c ->
