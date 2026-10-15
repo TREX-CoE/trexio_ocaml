@@ -27,7 +27,7 @@ dev-repo: "git+https://github.com/trex-coe/trexio_ocaml.git"
 url {
   src: "https://github.com/trex-coe/trexio_ocaml/archive/v2.6.101.tar.gz"
   checksum: [
-    "md5=b703c57dfc6b79affbf853386ae3c443"
-    "sha512=131deb518624537e64fcde021601df4419830d86cb67f8e3175a019d0fc90c17fb69c29334eae265336a4d15a103f863d4652f98a337063f52131ae9e30c5f23"
+    "md5=e8290fadfbe52ddb9cdca2ac3f85a98c"
+    "sha512=8f25fe7aac45f22bbe9d3fd5ed22da98882f326505a1fd85ca87fb8cf3b12cf0c630887efb1a86b19532ce925be872bc5f4d3593c497d9447521fa02a4068166"
   ]
 }
