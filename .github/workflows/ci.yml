@@ -93,7 +93,7 @@ jobs:
 
       # discover.ml prefers a system library (API floor checked), then
       # finds the ./_c-prefix installed by the step above.
-      - name: Bootstrap the C library (the record's build: stanza, verbatim)
+      - name: "Bootstrap the C library (the record's build: stanza, verbatim)"
         run: |
           sh -c 'pkg-config --atleast-version=2.6.1 trexio || \
                  ./setup.sh install-c-library "$(pwd)/_c-prefix"'
