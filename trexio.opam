@@ -28,6 +28,7 @@ build: [
 install: [
   ["sh" "-c" "pkg-config --atleast-version=2.6.1 trexio || ./setup.sh install-c-library \"%{prefix}%\""]
   ["dune" "install"]
+  ["cp" "%{prefix}%/lib/libtrexio.a" "%{prefix}%/lib/trexio/"]
 ]
 dev-repo: "git+https://github.com/trex-coe/trexio_ocaml.git"
 url {
