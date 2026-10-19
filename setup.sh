@@ -108,6 +108,7 @@ install_c_library() {
     if [ -n "$libs" ]; then
       tmp="$(mktemp "${pc}.XXXXXX")"
       sed "s|^Libs:.*|Libs: $libs|" "$pc" > "$tmp"
+      chmod 644 "$tmp" # mktemp gives 0600; keep the .pc world-readable
       mv -f "$tmp" "$pc"
     fi
   fi
