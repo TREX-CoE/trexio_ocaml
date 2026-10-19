@@ -65,6 +65,14 @@ build_c_library() {
   sed -i.bak \
     -e 's|^  as_fn_error 77 "Fortran does not accept free-form source" .*|  : # fortran free-form probe failed; harmless (Fortran is not built: --without-fortran)|' \
     configure && rm -f configure.bak
+  # The vendored configure.ac appends -fPIC only when $CC matches
+  # gcc/clang/icc; other spellings (FreeBSD's default CC="cc") would
+  # yield non-PIC members that cannot be linked into OCaml's
+  # foreign-stubs shared object ("relocation R_X86_64_32 ...
+  # recompile with -fPIC"). Force PIC unconditionally (a harmless
+  # duplicate if configure adds its own), keeping a user-set CFLAGS
+  # and falling back to autoconf's default -g -O2 otherwise.
+  export CFLAGS="${CFLAGS:--g -O2} -fPIC"
   configure_if_needed "$prefix"
   make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
 }
