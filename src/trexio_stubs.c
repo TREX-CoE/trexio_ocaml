@@ -226,7 +226,7 @@ CAMLprim value caml_read_determinant_coefficient(value file_in, value offset_in,
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(buffer_size * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) buffer_size);
   for (size_t i=0 ; i<buffer_size ; ++i) {
      Store_double_field( result, i, buffer[i]);
   }

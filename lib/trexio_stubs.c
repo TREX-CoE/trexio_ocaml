@@ -535,7 +535,7 @@ CAMLprim value caml_read_safe_nucleus_charge(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -589,7 +589,7 @@ CAMLprim value caml_read_safe_nucleus_coord(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -803,7 +803,7 @@ CAMLprim value caml_read_safe_cell_a(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -857,7 +857,7 @@ CAMLprim value caml_read_safe_cell_b(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -911,7 +911,7 @@ CAMLprim value caml_read_safe_cell_c(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -965,7 +965,7 @@ CAMLprim value caml_read_safe_cell_g_a(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -1019,7 +1019,7 @@ CAMLprim value caml_read_safe_cell_g_b(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -1073,7 +1073,7 @@ CAMLprim value caml_read_safe_cell_g_c(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -1239,7 +1239,7 @@ CAMLprim value caml_read_safe_pbc_k_point(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -1293,7 +1293,7 @@ CAMLprim value caml_read_safe_pbc_k_point_weight(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2067,7 +2067,7 @@ CAMLprim value caml_read_safe_basis_shell_factor(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2337,7 +2337,7 @@ CAMLprim value caml_read_safe_basis_exponent(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2391,7 +2391,7 @@ CAMLprim value caml_read_safe_basis_exponent_im(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2445,7 +2445,7 @@ CAMLprim value caml_read_safe_basis_coefficient(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2499,7 +2499,7 @@ CAMLprim value caml_read_safe_basis_coefficient_im(value file_in, value size_max
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2553,7 +2553,7 @@ CAMLprim value caml_read_safe_basis_oscillation_arg(value file_in, value size_ma
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2642,7 +2642,7 @@ CAMLprim value caml_read_safe_basis_prim_factor(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2726,7 +2726,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_radius(value file_in, value size_ma
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2780,7 +2780,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_phi(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2834,7 +2834,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_grad(value file_in, value size_max_
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2888,7 +2888,7 @@ CAMLprim value caml_read_safe_basis_nao_grid_lap(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -2977,7 +2977,7 @@ CAMLprim value caml_read_safe_basis_interpolator_phi(value file_in, value size_m
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -3031,7 +3031,7 @@ CAMLprim value caml_read_safe_basis_interpolator_grad(value file_in, value size_
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -3085,7 +3085,7 @@ CAMLprim value caml_read_safe_basis_interpolator_lap(value file_in, value size_m
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -3407,7 +3407,7 @@ CAMLprim value caml_read_safe_ecp_exponent(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -3461,7 +3461,7 @@ CAMLprim value caml_read_safe_ecp_coefficient(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -3746,7 +3746,7 @@ CAMLprim value caml_read_safe_grid_coord(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -3800,7 +3800,7 @@ CAMLprim value caml_read_safe_grid_weight(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -3884,7 +3884,7 @@ CAMLprim value caml_read_safe_grid_ang_coord(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -3938,7 +3938,7 @@ CAMLprim value caml_read_safe_grid_ang_weight(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4022,7 +4022,7 @@ CAMLprim value caml_read_safe_grid_rad_coord(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4076,7 +4076,7 @@ CAMLprim value caml_read_safe_grid_rad_weight(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4266,7 +4266,7 @@ CAMLprim value caml_read_safe_ao_normalization(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4342,7 +4342,7 @@ CAMLprim value caml_read_safe_ao_1e_int_overlap(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4396,7 +4396,7 @@ CAMLprim value caml_read_safe_ao_1e_int_kinetic(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4450,7 +4450,7 @@ CAMLprim value caml_read_safe_ao_1e_int_potential_n_e(value file_in, value size_
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4504,7 +4504,7 @@ CAMLprim value caml_read_safe_ao_1e_int_ecp(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4558,7 +4558,7 @@ CAMLprim value caml_read_safe_ao_1e_int_core_hamiltonian(value file_in, value si
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4612,7 +4612,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_x(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4666,7 +4666,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_y(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4720,7 +4720,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_z(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4774,7 +4774,7 @@ CAMLprim value caml_read_safe_ao_1e_int_overlap_im(value file_in, value size_max
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4828,7 +4828,7 @@ CAMLprim value caml_read_safe_ao_1e_int_kinetic_im(value file_in, value size_max
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4882,7 +4882,7 @@ CAMLprim value caml_read_safe_ao_1e_int_potential_n_e_im(value file_in, value si
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4936,7 +4936,7 @@ CAMLprim value caml_read_safe_ao_1e_int_ecp_im(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -4990,7 +4990,7 @@ CAMLprim value caml_read_safe_ao_1e_int_core_hamiltonian_im(value file_in, value
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -5044,7 +5044,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_x_im(value file_in, value size_ma
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -5098,7 +5098,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_y_im(value file_in, value size_ma
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -5152,7 +5152,7 @@ CAMLprim value caml_read_safe_ao_1e_int_dipole_z_im(value file_in, value size_ma
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -5723,7 +5723,7 @@ CAMLprim value caml_read_safe_mo_coefficient(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -5777,7 +5777,7 @@ CAMLprim value caml_read_safe_mo_coefficient_im(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -5977,7 +5977,7 @@ CAMLprim value caml_read_safe_mo_occupation(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6031,7 +6031,7 @@ CAMLprim value caml_read_safe_mo_energy(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6215,7 +6215,7 @@ CAMLprim value caml_read_safe_mo_1e_int_overlap(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6269,7 +6269,7 @@ CAMLprim value caml_read_safe_mo_1e_int_kinetic(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6323,7 +6323,7 @@ CAMLprim value caml_read_safe_mo_1e_int_potential_n_e(value file_in, value size_
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6377,7 +6377,7 @@ CAMLprim value caml_read_safe_mo_1e_int_ecp(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6431,7 +6431,7 @@ CAMLprim value caml_read_safe_mo_1e_int_core_hamiltonian(value file_in, value si
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6485,7 +6485,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_x(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6539,7 +6539,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_y(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6593,7 +6593,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_z(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6647,7 +6647,7 @@ CAMLprim value caml_read_safe_mo_1e_int_overlap_im(value file_in, value size_max
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6701,7 +6701,7 @@ CAMLprim value caml_read_safe_mo_1e_int_kinetic_im(value file_in, value size_max
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6755,7 +6755,7 @@ CAMLprim value caml_read_safe_mo_1e_int_potential_n_e_im(value file_in, value si
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6809,7 +6809,7 @@ CAMLprim value caml_read_safe_mo_1e_int_ecp_im(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6863,7 +6863,7 @@ CAMLprim value caml_read_safe_mo_1e_int_core_hamiltonian_im(value file_in, value
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6917,7 +6917,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_x_im(value file_in, value size_ma
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -6971,7 +6971,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_y_im(value file_in, value size_ma
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -7025,7 +7025,7 @@ CAMLprim value caml_read_safe_mo_1e_int_dipole_z_im(value file_in, value size_ma
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -8451,7 +8451,7 @@ CAMLprim value caml_read_safe_rdm_1e(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -8505,7 +8505,7 @@ CAMLprim value caml_read_safe_rdm_1e_up(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -8559,7 +8559,7 @@ CAMLprim value caml_read_safe_rdm_1e_dn(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -8613,7 +8613,7 @@ CAMLprim value caml_read_safe_rdm_1e_transition(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -9717,7 +9717,7 @@ CAMLprim value caml_read_safe_jastrow_en(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -9771,7 +9771,7 @@ CAMLprim value caml_read_safe_jastrow_ee(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -9825,7 +9825,7 @@ CAMLprim value caml_read_safe_jastrow_een(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -10017,7 +10017,7 @@ CAMLprim value caml_read_safe_jastrow_en_scaling(value file_in, value size_max_i
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -10123,7 +10123,7 @@ CAMLprim value caml_read_safe_qmc_point(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -10177,7 +10177,7 @@ CAMLprim value caml_read_safe_qmc_psi(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -10231,7 +10231,7 @@ CAMLprim value caml_read_safe_qmc_e_loc(value file_in, value size_max_in)
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
@@ -10356,7 +10356,7 @@ CAMLprim value caml_read_determinant_coefficient(value file_in, value offset_in,
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(buffer_size * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) buffer_size);
   for (size_t i=0 ; i<buffer_size ; ++i) {
      Store_double_field( result, i, buffer[i]);
   }

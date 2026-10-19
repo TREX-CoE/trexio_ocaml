@@ -236,7 +236,7 @@ CAMLprim value caml_read_safe_{group}_{element}(value file_in, value size_max_in
      caml_failwith(trexio_string_of_error(rc));
   }
 
-  result = caml_alloc(size_max * Double_wosize, Double_array_tag);
+  result = caml_alloc_float_array((mlsize_t) size_max);
   for (size_t i=0 ; i<size_max ; ++i) {
     Store_double_field( result, i, read_data[i] );
   }
