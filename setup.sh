@@ -71,12 +71,24 @@ build_c_library() {
 
 # Re-run ./configure only if the Makefile's recorded --prefix differs: the
 # installed trexio.pc has its libdir substituted at configure time.
+#
+# The released v2.6.1 configure defaults to --with-hdf5=yes and dies with
+# "HDF5 not found: install pkg-config .pc file or h5cc, or use
+# --with-hdf5=PATH" on systems without HDF5 unless told otherwise. Probe
+# HDF5 exactly the way configure does (a pkg-config `hdf5 >= 1.8` module,
+# else h5cc in PATH) and pass --without-hdf5 only when it is absent: one
+# configure call either way, no failed-configure noise in the log. A future
+# configure that auto-falls-back when HDF5 is missing stays compatible,
+# since we never force HDF5 on -- we only turn it off when it is absent.
 configure_if_needed() {
-  local prefix="$1" cur=""
+  local prefix="$1" cur="" hdf5=""
   [ -f Makefile ] && cur="$(sed -n 's/^prefix *= *//p' Makefile | head -1)"
   [ "$cur" = "$prefix" ] && return 0
-  ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=yes \
-    || ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared --with-hdf5=no
+  if ! { command -v pkg-config >/dev/null && pkg-config --exists "hdf5 >= 1.8" 2>/dev/null; } \
+     && ! command -v h5cc >/dev/null; then
+    hdf5=--without-hdf5
+  fi
+  ./configure --prefix="$prefix" --without-fortran --enable-static --disable-shared $hdf5
 }
 
 # One-shot bootstrap (make bootstrap, CI, the record's install: stanza).
