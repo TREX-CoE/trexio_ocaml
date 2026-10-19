@@ -62,7 +62,18 @@ let occ_up_ref = [ 0; 1; 2; 3; 75; 127; 128; 142 ]
 let occ_dn_ref = [ 0; 2; 3; 79; 80; 138 ]
 
 let bytes_of_occupations n_words occs =
-  (* Bytes.create fills with spaces; Bytes.init for zeros. *)
+  (* Host-endian int64 words: each word is serialized bit-patternwise into
+     host byte order via Sys.big_endian (the OCaml stdlib has no
+     Int64<->bytes conversion), which is exactly what the C library sees
+     in the buffer on any platform. Bytes.init for zeros. *)
+  let words = Array.make n_words 0L in
+  let put_word (b : bytes) (off : int) (w : Int64.t) =
+    for j = 0 to 7 do
+      let k = if Sys.big_endian then 7 - j else j in (* 8-bit chunk of w that fills byte j *)
+      Bytes.set b (off + j) (Char.chr
+                  (Int64.to_int (Int64.logand (Int64.shift_right_logical w (8 * k)) 0xFFL)))
+    done
+  in
   let b = Bytes.init (n_words * 8) (fun _ -> Char.chr 0) in
   List.iter (fun occ ->
     if occ < 0 || occ >= n_words * 64 then
@@ -70,10 +81,11 @@ let bytes_of_occupations n_words occs =
              occ (n_words * 64));
     let word = occ / 64 in
     let bit  = occ mod 64 in
-    let byte = word * 8 + bit / 8 in
-    let mask = 1 lsl (bit mod 8) in
-    Bytes.set b byte (Char.chr (Char.code (Bytes.get b byte) lor mask))
+    words.(word) <- Int64.logor words.(word) (Int64.shift_left 1L bit)
   ) occs;
+  for w = 0 to n_words - 1 do
+    put_word b (8 * w) words.(w)
+  done;
   b
 
 let up_ref  = bytes_of_occupations int_num occ_up_ref
@@ -160,7 +172,11 @@ let read_chunks read total buffer_size =
   in
   loop 0 []
 
-(* Little-endian 8-byte buffers -> Int64 words (x86-64 TREXIO layout). *)
+(* Host-endian 8-byte buffers -> Int64 words: the buffer order is the
+   one the C library uses for the TREXIO on-disk int64 layout on any
+   platform, so decode it with the same Sys.big_endian-aware chunk
+   order as [bytes_of_occupations] uses when writing (the OCaml
+   stdlib has no Int64<->bytes conversion). *)
 let int64_words (b : bytes) : Int64.t array =
   let n = Bytes.length b / 8 in
   let a = Array.make n 0L in
@@ -168,8 +184,9 @@ let int64_words (b : bytes) : Int64.t array =
     let off = 8 * i in
     let w = ref 0L in
     for j = 0 to 7 do
+      let k = if Sys.big_endian then 7 - j else j in
       w := Int64.logor !w
-           (Int64.shift_left (Int64.of_int (Char.code (Bytes.get b (off + j)))) (8 * j))
+           (Int64.shift_left (Int64.of_int (Char.code (Bytes.get b (off + j)))) (8 * k))
     done;
     a.(i) <- !w
   done;
