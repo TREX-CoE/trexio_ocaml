@@ -289,7 +289,7 @@ let () =
   let _ = Trexio.info () in                      (* smoke *)
   let _ = Sys.command (Printf.sprintf "rm -f %s" h5_file) in
   let _ = Sys.command (Printf.sprintf "rm -rf %s" text_file) in
-  let _ = (try Sys.mkdir dir 0o755 with Sys_error _ -> ()) in
+  let _ = (try Unix.mkdir dir 0o755 with Unix.Unix_error _ -> ()) in
   ( write text_file Trexio.TEXT; read text_file Trexio.TEXT )   (* must pass *)
   ;
   ( try (write h5_file Trexio.HDF5; read h5_file Trexio.HDF5)

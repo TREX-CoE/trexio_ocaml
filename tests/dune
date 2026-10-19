@@ -8,4 +8,4 @@
   (bash
    "export LD_LIBRARY_PATH=\"../lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\";
     export CAML_LD_LIBRARY_PATH=\"../lib${CAML_LD_LIBRARY_PATH:+:$CAML_LD_LIBRARY_PATH}\";
-    exec %{test}")))
+    exec ./%{test}")))
