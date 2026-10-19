@@ -98,12 +98,18 @@ install_c_library() {
   build_c_library "$prefix"
   make install prefix="$prefix"
   # Plain `pkg-config --libs` must link the static archive: merge the
-  # static (private) deps into the installed .pc Libs line.
+  # static (private) deps into the installed .pc Libs line. Rewrite via
+  # temp file + mv: bare `sed -i` is GNU-only — BSD sed eats the
+  # expression as its backup-extension argument (macOS).
   local pc="$prefix/lib/pkgconfig/trexio.pc"
   if [ -f "$pc" ]; then
-    local libs
+    local libs tmp
     libs="$(PKG_CONFIG_PATH="$prefix/lib/pkgconfig" pkg-config --libs --static trexio 2>/dev/null || true)"
-    [ -n "$libs" ] && sed -i "s|^Libs:.*|Libs: $libs|" "$pc"
+    if [ -n "$libs" ]; then
+      tmp="$(mktemp "${pc}.XXXXXX")"
+      sed "s|^Libs:.*|Libs: $libs|" "$pc" > "$tmp"
+      mv -f "$tmp" "$pc"
+    fi
   fi
   cd -
   echo "TREXIO C library installed to: $prefix  (use PKG_CONFIG_PATH=\"\$prefix/lib/pkgconfig\")" >&2
